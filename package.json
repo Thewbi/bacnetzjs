@@ -4,6 +4,7 @@
   "description": "BACnet JavaScript Stack",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
     "test": "test"
   },
   "author": "",
