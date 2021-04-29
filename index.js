@@ -14,11 +14,21 @@ const MessageToDeviceObjectConverter = require("./conversion/MessageToDeviceObje
 
 // wireshark display filter: bacnet || bvlc || bacapp
 
-var DESTINATION_PORT = 47808;
-var DESTINATION_ADDRESS = "192.168.2.10";
+// loytec local lan
+//var DESTINATION_PORT = 47808;
+//var DESTINATION_ADDRESS = "192.168.2.10";
 
+// WAGO local lan
+var DESTINATION_PORT = 47808;
+var DESTINATION_ADDRESS = "192.168.26.154";
+
+// broadcast local lan
+//var BROADCAST_LISTENING_PORT = 47808;
+//var BROADCAST_ADDR = "192.168.2.255";
+
+// for WAGO 750-831
 var BROADCAST_LISTENING_PORT = 47808;
-var BROADCAST_ADDR = "192.168.2.255";
+var BROADCAST_ADDR = "192.168.26.255";
 
 // sends broadcast messages
 var server = dgram.createSocket("udp4");
@@ -27,11 +37,12 @@ var server = dgram.createSocket("udp4");
 var client = dgram.createSocket("udp4");
 
 // Request: 810a001301000005010c0c02002710194c2900
-// Temp:    810a001301000005010c0c02002710194c2900
-function requestObjectListSize() {
+function requestObjectListSize(objectType, bacnetIdentifier) {
   let deviceObject = new DeviceObject();
-  deviceObject.objectType = 8; // 8 is device
-  deviceObject.bacnetIdentifier = 10000;
+  //deviceObject.objectType = 8; // 8 is device
+  //deviceObject.bacnetIdentifier = 10000;
+  deviceObject.objectType = objectType; // 8 is device
+  deviceObject.bacnetIdentifier = bacnetIdentifier;
 
   let messageFactory = new MessageFactory();
   let message = messageFactory.objectListSize(deviceObject);
@@ -58,7 +69,8 @@ function requestObjectListSize() {
   );
 }
 
-requestObjectListSize();
+//requestObjectListSize(8, 10000);
+requestObjectListSize(8, 1000);
 
 // stackoverflow.com/questions/6177423/send-broadcast-datagram
 https: function broadcastNew() {
