@@ -1,6 +1,7 @@
 const VirtualLinkControl = require("../protocol/virtualinkcontrol.js");
 const NPDU = require("../protocol/npdu.js");
 const APDU = require("../protocol/apdu.js");
+const PDUType = require("../protocol/pdutype.js");
 
 class Message {
   get dataLength() {
@@ -89,16 +90,15 @@ class Message {
   get asString() {
     var output = "[Message] ";
 
-    output += "APDU: " + this.apdu + " ";
+    output += "APDU: " + this.apdu.asString + " ";
 
     // retrieve type of message from APDU
     switch (this.apdu.pduType) {
-      case 0x01:
+      case PDUType.UNCONFIRMED_SERVICE_REQUEST_PDU:
         // unconfirmed request
 
         switch (this.apdu.unconfirmedServiceChoice) {
-          case 0x00:
-            // I-AM
+          case UnconfirmedServiceChoice.I_AM:
             output += "I-AM ";
 
             // output object identifier
@@ -120,8 +120,7 @@ class Message {
 
             break;
 
-          case 0x08:
-            // WHO-IS
+          case UnconfirmedServiceChoice.WHO_IS:
             output += "WHO-IS, dataLength = " + this.dataLength;
             break;
 
@@ -132,6 +131,10 @@ class Message {
               " ";
             break;
         }
+        break;
+
+      case PDUType.COMPLEX_ACK_PDU:
+        output += "COMPLEX_ACK_PDU ";
         break;
 
       default:

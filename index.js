@@ -52,6 +52,44 @@ function requestObjectListSize(objectType, bacnetIdentifier) {
   let payload = message.bytes;
 
   var socket = dgram.createSocket("udp4");
+
+  // add handlers first, before sending a request
+  socket.on('listening', function () {
+      var address = socket.address();
+      console.log('UDP Server listening on ' + address.address + ":" + address.port);
+  });
+
+  // add handlers first, before sending a request
+  socket.on('message', function (message, remoteInfo) {
+      console.log('Response from ' + remoteInfo.address + ':' + remoteInfo.port +' - ' + byteArrayToHexString(message));
+
+      // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+
+      var offset = 0;
+
+      var virtualLinkControl = new VirtualLinkControl();
+      virtualLinkControl.fromBytes(message, offset);
+      offset += virtualLinkControl.dataSizeInBuffer;
+
+      var npdu = new NPDU();
+      npdu.fromBytes(message, offset);
+      offset += npdu.dataSizeInBuffer;
+
+      var apdu = new APDU();
+      apdu.fromBytes(message, offset);
+      offset += apdu.dataSizeInBuffer;
+
+      // incoming BACNet message
+      var bacnetMessage = new Message();
+      bacnetMessage.remoteInfo = remoteInfo;
+      bacnetMessage.virtualLinkControl = virtualLinkControl;
+      bacnetMessage.npdu = npdu;
+      bacnetMessage.apdu = apdu;
+
+      console.log("Incoming Message as String: " + bacnetMessage.asString);
+  });
+
+  // send a request and keep the socket open so the response can be retrieved
   socket.send(
     payload,
     offset,

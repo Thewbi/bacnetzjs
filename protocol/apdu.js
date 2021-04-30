@@ -1,8 +1,10 @@
 const ServiceParameter = require("./serviceparameter.js");
 const PDUType = require("./pdutype.js");
+const UnconfirmedServiceChoice = require("./UnconfirmedServiceChoice.js");
 
 class APDU {
   constructor() {
+    this.pduType = -1;
     this.invokeId = -1;
     this.sequenceNumber = -1;
     this.proposedWindowSize = -1;
@@ -108,13 +110,14 @@ class APDU {
     this.offset = offset;
     this.currentPosition = offset;
 
-    // parse type
+    // 1 byte - parse type and flags
     this.pduType = message[offset + 0];
+    this.pduType = (this.pduType & 240) >> 4;
     this.currentPosition++;
 
-    this.pduType = (this.pduType & 240) >> 4;
+    // 1 byte - invoke id
 
-    // parse service choice
+    // 1 byte - parse service choice - how to decide whether this is confirmed or unconfirmed?
     this.unconfirmedServiceChoice = message[offset + 1];
     this.currentPosition++;
 
@@ -133,6 +136,179 @@ class APDU {
       this.currentPosition += serviceParameter.dataSizeInBuffer;
     }
   }
+
+  public void fromBytes(final byte[] data, final int startIndex, final int payloadLength) {
+
+    int offset = 0;
+    structureLength = 0;
+
+    //
+    // PDU type
+
+    // bits 7-4 are the PDU type
+    final int pduTypeBits = (data[startIndex + offset] & 0xF0) >> 4;
+    pduType = PDUType.fromInt(pduTypeBits);
+
+    //
+    // PDU flags
+
+    // bit 3 is the segmentation bit
+    segmentation = 0 < (data[startIndex + offset] & 0x08);
+//        if (segmentation) {
+//            // TODO: if there is segmentation, there are special segmentation bytes present
+//            // in the APDU that have to be parsed.
+//            throw new RuntimeException("Not implemented yet!");
+//        }
+
+    // bit 2 is the moreSegmentsFollow bit
+    moreSegmentsFollow = 0 < (data[startIndex + offset] & 0x04);
+//        if (moreSegmentsFollow) {
+//            throw new RuntimeException("Not implemented yet!");
+//        }
+
+    // bit 1 is the segmentedResponseAccepted bit
+    segmentedResponseAccepted = 0 < (data[startIndex + offset] & 0x02);
+    if (segmentedResponseAccepted) {
+        LOG.info("segmentedResponseAccepted bit");
+    }
+
+    offset++;
+    structureLength++;
+
+    // Response Information
+    //
+    // The ReadProperty request for max-apdu-length-accepted does not set the bit 2
+    // but still contains segmentation information
+    if (segmentedResponseAccepted || pduType == PDUType.CONFIRMED_SERVICE_REQUEST_PDU) {
+
+        segmentationControl = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        // invoke ID
+        invokeId = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        // unconfirmed service choice
+        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
+        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
+
+    } else if (pduType == PDUType.SIMPLE_ACK_PDU) {
+
+        // invoke ID
+        invokeId = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        // confirmed service choice
+        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
+        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
+
+    } else if (pduType == PDUType.COMPLEX_ACK_PDU) {
+
+        // this branch was introduced for parsing the response message of a
+        // read-property request towards a bacnet device object
+
+        // invoke ID
+        invokeId = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        //
+        // SEGMENTATION SPECIFIC - START
+        //
+
+        if (segmentation || moreSegmentsFollow) {
+
+            // sequence number
+            sequenceNumber = data[startIndex + offset] & 0xFF;
+            offset++;
+            structureLength++;
+
+            // proposed window size
+            proposedWindowSize = data[startIndex + offset] & 0xFF;
+            offset++;
+            structureLength++;
+        }
+
+        //
+        // SEGMENTATION SPECIFIC - STOP
+        //
+
+        // service choice
+        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
+        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
+
+    } else if (pduType == PDUType.ERROR_PDU) {
+
+        // invokeid
+        invokeId = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        // service choice
+        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
+        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
+        offset++;
+        structureLength++;
+
+        // read ServiceParameter ErrorClass
+        final ServiceParameter errorClassServiceParameter = new ServiceParameter();
+        int delta = errorClassServiceParameter.fromBytes(data, startIndex + offset);
+        offset += delta;
+        structureLength += delta;
+        serviceParameters.add(errorClassServiceParameter);
+
+        // read ServiceParameter ErrorCode
+        final ServiceParameter errorCodeServiceParameter = new ServiceParameter();
+        delta = errorCodeServiceParameter.fromBytes(data, startIndex + offset);
+        offset += delta;
+        structureLength += delta;
+        serviceParameters.add(errorCodeServiceParameter);
+
+        final ErrorClass errorClass = ErrorClass.fromInt(errorClassServiceParameter.getPayload()[0] & 0xFF);
+        final ErrorCode errorCode = ErrorCode.fromInt(errorCodeServiceParameter.getPayload()[0] & 0xFF);
+
+        LOG.error("Error detected! ErrorClass: " + errorClass + " ErrorCode: " + errorCode);
+
+        // no further processing
+        return;
+
+    } else if (pduType == PDUType.SIMPLE_ACK_PDU) {
+
+        // invokeid
+        invokeId = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        // sequence number
+        sequenceNumber = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+        // proposedWindowSize
+        proposedWindowSize = data[startIndex + offset] & 0xFF;
+        offset++;
+        structureLength++;
+
+    } else {
+
+        // unconfirmed service choice
+        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
+        unconfirmedServiceChoice = UnconfirmedServiceChoice.fromInt(serviceChoiceCode);
+
+    }
+
+    offset++;
+    structureLength++;
+
+    payload = Arrays.copyOfRange(data, startIndex + offset, payloadLength);
+
+    LOG.info(Utils.bytesToHex(payload));
+
+//        processPayload(data, startIndex, payloadLength, offset);
+}
 
   get dataSizeInBufferWithoutServiceParameters() {
     let dataLength = 0;
@@ -197,6 +373,10 @@ class APDU {
     }
 
     return dataLength;
+  }
+
+  get asString() {
+    return "[APDU] pduType = " + PDUType.getLabel(this.pduType) + " (" + this.pduType + ") UnconfirmedServiceChoice: " + UnconfirmedServiceChoice.getLabel(this.unconfirmedServiceChoice) + " ConfirmedServiceChoice: " + this.confirmedServiceChoice;
   }
 }
 

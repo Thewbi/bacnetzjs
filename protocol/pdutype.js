@@ -9,4 +9,36 @@ const PDUType = {
   ERROR_PDU: 0x05,
 };
 
-module.exports = PDUType;
+function getLabel(pduType) {
+
+  if (pduType == null) {
+    return "null";
+  }
+
+  switch (pduType) {
+
+    case PDUType.CONFIRMED_SERVICE_REQUEST_PDU:
+      return "CONFIRMED_SERVICE_REQUEST_PDU";
+
+      case PDUType.UNCONFIRMED_SERVICE_REQUEST_PDU:
+      return "UNCONFIRMED_SERVICE_REQUEST_PDU";
+
+      case PDUType.SIMPLE_ACK_PDU:
+      return "SIMPLE_ACK_PDU";
+
+      case PDUType.COMPLEX_ACK_PDU:
+      return "COMPLEX_ACK_PDU";
+
+      case PDUType.SEGMENT_ACK_PDU:
+      return "SEGMENT_ACK_PDU";
+
+      case PDUType.ERROR_PDU:
+      return "ERROR_PDU";
+
+      default:
+        return "UKNOWN";
+  }
+
+}
+
+module.exports = { PDUType, getLabel };
