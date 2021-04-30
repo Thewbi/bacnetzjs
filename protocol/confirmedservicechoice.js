@@ -37,4 +37,79 @@ const ConfirmedServiceChoice = {
   vtData: 23,
 };
 
-module.exports = ConfirmedServiceChoice;
+function getLabel(confirmedServiceChoice) {
+  if (confirmedServiceChoice == null) {
+    return null;
+  }
+
+  switch (confirmedServiceChoice) {
+    case ConfirmedServiceChoice.acknowledgeAlarm:
+      return "acknowledgeAlarm";
+
+    case ConfirmedServiceChoice.confirmedCOVNotification:
+      return "confirmedCOVNotification";
+    case ConfirmedServiceChoice.confirmedEventNotification:
+      return "confirmedEventNotification";
+    case ConfirmedServiceChoice.getAlarmSummary:
+      return "getAlarmSummary";
+    case ConfirmedServiceChoice.getEnrollmentSummary:
+      return "getEnrollmentSummary";
+    case ConfirmedServiceChoice.getEventInformation:
+      return "getEventInformation";
+    case ConfirmedServiceChoice.SUBSCRIBE_COV:
+      return "SUBSCRIBE_COV";
+    case ConfirmedServiceChoice.subscribeCOVProperty:
+      return "subscribeCOVProperty";
+    case ConfirmedServiceChoice.lifeSafetyOperation:
+      return "lifeSafetyOperation";
+
+    // File Access Services
+    case ConfirmedServiceChoice.atomicReadFile:
+      return "atomicReadFile";
+    case ConfirmedServiceChoice.atomicWriteFile:
+      return "atomicWriteFile";
+
+    //  Object Access Services
+    case ConfirmedServiceChoice.ADD_LIST_ELEMENT:
+      return "ADD_LIST_ELEMENT";
+    case ConfirmedServiceChoice.removeListElement:
+      return "removeListElement";
+    case ConfirmedServiceChoice.createObject:
+      return "createObject";
+    case ConfirmedServiceChoice.deleteObject:
+      return "deleteObject";
+    case ConfirmedServiceChoice.READ_PROPERTY:
+      return "READ_PROPERTY";
+    case ConfirmedServiceChoice.READ_PROPERTY_MULTIPLE:
+      return "READ_PROPERTY_MULTIPLE";
+    case ConfirmedServiceChoice.readRange:
+      return "readRange";
+    case WRITE_PROPERTY:
+      return "WRITE_PROPERTY";
+    case ConfirmedServiceChoice.writePropertyMultiple:
+      return "writePropertyMultiple";
+
+    //  Remote Device Management Services
+    case ConfirmedServiceChoice.deviceCommunicationControl:
+      return "deviceCommunicationControl";
+    case ConfirmedServiceChoice.confirmedPrivateTransfer:
+      return "confirmedPrivateTransfer";
+    case ConfirmedServiceChoice.confirmedTextMessage:
+      return "confirmedTextMessage";
+    case ConfirmedServiceChoice.REINITIALIZE_DEVICE:
+      return "REINITIALIZE_DEVICE";
+
+    //  Virtual Terminal Services
+    case ConfirmedServiceChoice.vtOpen:
+      return "vtOpen";
+    case ConfirmedServiceChoice.vtClose:
+      return "vtClose";
+    case ConfirmedServiceChoice.vtData:
+      return "vtData";
+
+    default:
+      return "UNKNOWN ConfirmedServiceChoice " + confirmedServiceChoice;
+  }
+}
+
+module.exports = { ConfirmedServiceChoice, getLabel };

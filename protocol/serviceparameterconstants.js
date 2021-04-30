@@ -1,14 +1,23 @@
 const ServiceParameterConstants = {
-  CLOSING_TAG_CODE: 7,
-
-  OPENING_TAG_CODE: 6,
+  PROPERTY_IDENTIFIER_CODE: 0x01,
 
   EXTENDED_TAG_CODE: 5,
 
+  OPENING_TAG_CODE: 6,
+
+  CLOSING_TAG_CODE: 7,
+
+  // Application Tag: Character String
+  CHARACTER_STRING_CODE: 7,
+
+  OBJECT_IDENTIFIER_CODE: 0x04,
+
+  // Application Tag: Enumerated Code
   ENUMERATED_CODE: 9,
 
   UNKOWN_TAG_NUMBER: 1,
 
+  // Application Tag: Unsigned integer
   UNSIGNED_INTEGER_CODE: 2,
 
   BOOLEAN_CODE: 1,
@@ -37,7 +46,9 @@ const ServiceParameterConstants = {
 
   APPLICATION_TAG_NUMBER_BIT_STRING: 8,
 
+  APPLICATION_TAG_BACNET_OBJECT_IDENTIFIER: 12,
+
   SIGNED_INTEGER_TWOS_COMMPLEMENT_NOTATION: 3,
 };
 
-module.exports = ServiceParameterConstants;
+module.exports = { ServiceParameterConstants };

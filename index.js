@@ -12,6 +12,8 @@ const Message = require("./transport/message.js");
 const DeviceObject = require("./model/deviceobject.js");
 const MessageToDeviceObjectConverter = require("./conversion/MessageToDeviceObjectConverter.js");
 
+const util = require("./common/util.js");
+
 // wireshark display filter: bacnet || bvlc || bacapp
 
 // loytec local lan
@@ -54,39 +56,50 @@ function requestObjectListSize(objectType, bacnetIdentifier) {
   var socket = dgram.createSocket("udp4");
 
   // add handlers first, before sending a request
-  socket.on('listening', function () {
-      var address = socket.address();
-      console.log('UDP Server listening on ' + address.address + ":" + address.port);
+  socket.on("listening", function () {
+    var address = socket.address();
+    console.log(
+      "UDP Server listening on " + address.address + ":" + address.port
+    );
   });
 
   // add handlers first, before sending a request
-  socket.on('message', function (message, remoteInfo) {
-      console.log('Response from ' + remoteInfo.address + ':' + remoteInfo.port +' - ' + byteArrayToHexString(message));
+  socket.on("message", function (message, remoteInfo) {
+    console.log(
+      "Response from " +
+        remoteInfo.address +
+        ":" +
+        remoteInfo.port +
+        " - " +
+        util.byteArrayToHexString(message)
+    );
 
-      // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
 
-      var offset = 0;
+    var offset = 0;
 
-      var virtualLinkControl = new VirtualLinkControl();
-      virtualLinkControl.fromBytes(message, offset);
-      offset += virtualLinkControl.dataSizeInBuffer;
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.fromBytes(message, offset);
+    offset += virtualLinkControl.dataSizeInBuffer;
 
-      var npdu = new NPDU();
-      npdu.fromBytes(message, offset);
-      offset += npdu.dataSizeInBuffer;
+    var npdu = new NPDU();
+    npdu.fromBytes(message, offset);
+    offset += npdu.dataSizeInBuffer;
 
-      var apdu = new APDU();
-      apdu.fromBytes(message, offset);
-      offset += apdu.dataSizeInBuffer;
+    var apdu = new APDU();
+    apdu.fromBytes(message, offset);
+    offset += apdu.dataSizeInBuffer;
 
-      // incoming BACNet message
-      var bacnetMessage = new Message();
-      bacnetMessage.remoteInfo = remoteInfo;
-      bacnetMessage.virtualLinkControl = virtualLinkControl;
-      bacnetMessage.npdu = npdu;
-      bacnetMessage.apdu = apdu;
+    // incoming BACNet message
+    var bacnetMessage = new Message();
+    bacnetMessage.remoteInfo = remoteInfo;
+    bacnetMessage.virtualLinkControl = virtualLinkControl;
+    bacnetMessage.npdu = npdu;
+    bacnetMessage.apdu = apdu;
 
-      console.log("Incoming Message as String: " + bacnetMessage.asString);
+    console.log("Incoming Message as String: " + bacnetMessage.asString);
+
+    bacnetMessage.parseServiceParameters();
   });
 
   // send a request and keep the socket open so the response can be retrieved
@@ -99,7 +112,7 @@ function requestObjectListSize(objectType, bacnetIdentifier) {
     function () {
       console.log(
         "Sent '" +
-          byteArrayToHexString(payload) +
+          util.byteArrayToHexString(payload) +
           "' Length = " +
           payload.length
       );
@@ -108,7 +121,173 @@ function requestObjectListSize(objectType, bacnetIdentifier) {
 }
 
 //requestObjectListSize(8, 10000);
-requestObjectListSize(8, 1000);
+//requestObjectListSize(8, 1000);
+
+function requestObjectList(objectType, bacnetIdentifier) {
+  let deviceObject = new DeviceObject();
+  //deviceObject.objectType = 8; // 8 is device
+  //deviceObject.bacnetIdentifier = 10000;
+  deviceObject.objectType = objectType; // 8 is device
+  deviceObject.bacnetIdentifier = bacnetIdentifier;
+
+  let messageFactory = new MessageFactory();
+  let message = messageFactory.objectList(deviceObject);
+
+  let offset = 0;
+
+  let payload = message.bytes;
+
+  var socket = dgram.createSocket("udp4");
+
+  // add handlers first, before sending a request
+  socket.on("listening", function () {
+    var address = socket.address();
+    console.log(
+      "UDP Server listening on " + address.address + ":" + address.port
+    );
+  });
+
+  // add handlers first, before sending a request
+  socket.on("message", function (message, remoteInfo) {
+    console.log(
+      "Response from " +
+        remoteInfo.address +
+        ":" +
+        remoteInfo.port +
+        " - " +
+        util.byteArrayToHexString(message)
+    );
+
+    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+
+    var offset = 0;
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.fromBytes(message, offset);
+    offset += virtualLinkControl.dataSizeInBuffer;
+
+    var npdu = new NPDU();
+    npdu.fromBytes(message, offset);
+    offset += npdu.dataSizeInBuffer;
+
+    var apdu = new APDU();
+    apdu.fromBytes(message, offset);
+    offset += apdu.dataSizeInBuffer;
+
+    // incoming BACNet message
+    var bacnetMessage = new Message();
+    bacnetMessage.remoteInfo = remoteInfo;
+    bacnetMessage.virtualLinkControl = virtualLinkControl;
+    bacnetMessage.npdu = npdu;
+    bacnetMessage.apdu = apdu;
+
+    console.log("Incoming Message as String: " + bacnetMessage.asString);
+
+    bacnetMessage.parseServiceParameters();
+  });
+
+  // send a request and keep the socket open so the response can be retrieved
+  socket.send(
+    payload,
+    offset,
+    payload.length,
+    DESTINATION_PORT,
+    DESTINATION_ADDRESS,
+    function () {
+      console.log(
+        "Sent '" +
+          util.byteArrayToHexString(payload) +
+          "' Length = " +
+          payload.length
+      );
+    }
+  );
+}
+
+//requestObjectList(8, 1000);
+
+function requestAllProperties(objectType, bacnetIdentifier) {
+  var socket = dgram.createSocket("udp4");
+
+  // add handlers first, before sending a request
+  socket.on("listening", function () {
+    var address = socket.address();
+    console.log(
+      "UDP Server listening on " + address.address + ":" + address.port
+    );
+  });
+
+  // add handlers first, before sending a request
+  socket.on("message", function (message, remoteInfo) {
+    console.log(
+      "Response from " +
+        remoteInfo.address +
+        ":" +
+        remoteInfo.port +
+        " - " +
+        util.byteArrayToHexString(message)
+    );
+
+    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+
+    var offset = 0;
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.fromBytes(message, offset);
+    offset += virtualLinkControl.dataSizeInBuffer;
+
+    var npdu = new NPDU();
+    npdu.fromBytes(message, offset);
+    offset += npdu.dataSizeInBuffer;
+
+    var apdu = new APDU();
+    apdu.fromBytes(message, offset);
+    offset += apdu.dataSizeInBuffer;
+
+    // incoming BACNet message
+    var bacnetMessage = new Message();
+    bacnetMessage.remoteInfo = remoteInfo;
+    bacnetMessage.virtualLinkControl = virtualLinkControl;
+    bacnetMessage.npdu = npdu;
+    bacnetMessage.apdu = apdu;
+
+    console.log("Incoming Message as String: " + bacnetMessage.asString);
+
+    bacnetMessage.parseServiceParameters();
+  });
+
+  let deviceObject = new DeviceObject();
+  //deviceObject.objectType = 8; // 8 is device
+  //deviceObject.bacnetIdentifier = 10000;
+  deviceObject.objectType = objectType; // 8 is device
+  deviceObject.bacnetIdentifier = bacnetIdentifier;
+
+  let messageFactory = new MessageFactory();
+  let message = messageFactory.propertiesAll(deviceObject);
+
+  let offset = 0;
+
+  let payload = message.bytes;
+
+  // send a request and keep the socket open so the response can be retrieved
+  socket.send(
+    payload,
+    offset,
+    payload.length,
+    DESTINATION_PORT,
+    DESTINATION_ADDRESS,
+    function () {
+      console.log(
+        "Sent '" +
+          util.byteArrayToHexString(payload) +
+          "' Length = " +
+          payload.length
+      );
+    }
+  );
+}
+
+requestAllProperties(17, 0);
 
 // stackoverflow.com/questions/6177423/send-broadcast-datagram
 https: function broadcastNew() {
@@ -117,7 +296,7 @@ https: function broadcastNew() {
   //var message = new Buffer([0x81, 0x0b, 0x00, 0x08, 0x01, 0x00, 0x10, 0x08]);
 
   let messageFactory = new MessageFactory();
-  let whoIsMessage = messageFactory.whoIsMessage();
+  let whoIsMessage = messageFactory.whoIs();
 
   //   // 810b000801001008
   //   console.log(
@@ -159,11 +338,14 @@ client.on("message", function (message, remoteInfo) {
       ":" +
       remoteInfo.port +
       " - " +
-      byteArrayToHexString(message)
+      util.byteArrayToHexString(message)
   );
 
   // ignore own broadcasts
-  if (remoteInfo.address == "192.168.2.2") {
+  if (
+    remoteInfo.address == "192.168.2.2" ||
+    remoteInfo.address == "192.168.26.2"
+  ) {
     console.log("ignoring own message!");
     return;
   }
@@ -236,10 +418,3 @@ client.on("message", function (message, remoteInfo) {
 //
 // STOP: ENABLE FOR WHO-IS
 //
-
-// https://stackoverflow.com/questions/34309988/byte-array-to-hex-string-conversion-in-javascript
-function byteArrayToHexString(byteArray) {
-  return Array.from(byteArray, function (byte) {
-    return ("0" + (byte & 0xff).toString(16)).slice(-2);
-  }).join("");
-}

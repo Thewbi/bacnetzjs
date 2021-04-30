@@ -2,25 +2,33 @@ const VirtualLinkControl = require("../protocol/virtualinkcontrol.js");
 const NPDU = require("../protocol/npdu.js");
 const APDU = require("../protocol/apdu.js");
 const PDUType = require("../protocol/pdutype.js");
+const UnconfirmedServiceChoice = require("../protocol/unconfirmedservicechoice.js");
+
+const util = require("../common/util.js");
 
 class Message {
   get dataLength() {
     let dataLength = 0;
 
     if (this.virtualLinkControl != null) {
-      //   dataLength += this.virtualLinkControl.dataLength;
       dataLength += this.virtualLinkControl.dataSizeInBuffer;
     }
     if (this.npdu != null) {
-      //dataLength += this.npdu.dataLength;
       dataLength += this.npdu.dataSizeInBuffer;
     }
     if (this.apdu != null) {
-      //dataLength += this.apdu.dataLength;
       dataLength += this.apdu.dataSizeInBuffer;
     }
 
     return dataLength;
+  }
+
+  parseServiceParameters() {
+    if (this.apdu == null) {
+      return;
+    }
+
+    this.apdu.parseServiceParameters();
   }
 
   get bytes() {
@@ -32,57 +40,42 @@ class Message {
 
     if (this.virtualLinkControl != null) {
       virtualLinkControlDataLength = this.virtualLinkControl.dataSizeInBuffer;
-      //LOG.trace("VirtualLinkControl.getDataLenght() {}", virtualLinkControlDataLength);
 
       length += virtualLinkControlDataLength;
     }
 
     if (this.npdu != null) {
       npduDataLength = this.npdu.dataSizeInBuffer;
-      //LOG.trace("NPDU.getDataLenght() {}", npduDataLength);
 
       length += npduDataLength;
     }
 
     if (this.apdu != null) {
       apduDataLength = this.apdu.dataSizeInBuffer;
-      //LOG.trace("APDU.getDataLenght() {}", apduDataLength);
 
       length += apduDataLength;
     }
 
     // https://nodejs.org/en/knowledge/advanced/buffers/how-to-use-buffers/
-    //final byte[] data = new byte[length];
     var data = Buffer.alloc(0);
 
-    //let offset = 0;
-
     if (this.virtualLinkControl != null) {
-      //virtualLinkControl.toBytes(data, offset);
-      //offset += virtualLinkControlDataLength;
-
       let tempBuffer = this.virtualLinkControl.bytes;
       data = Buffer.concat([data, tempBuffer]);
     }
 
     if (this.npdu != null) {
-      //   npdu.toBytes(data, offset);
-      //   offset += npduDataLength;
-
       let tempBuffer = this.npdu.bytes;
       data = Buffer.concat([data, tempBuffer]);
     }
 
     if (this.apdu != null) {
-      //   apdu.toBytes(data, offset);
-      //   offset += apduDataLength;
-
       let tempBuffer = this.apdu.bytes;
       data = Buffer.concat([data, tempBuffer]);
     }
 
-    var arrByte = Uint8Array.from(data);
-    //console.log(arrByte);
+    //var arrByte = Uint8Array.from(data);
+    console.log(util.byteArrayToHexString(data));
 
     return data;
   }
@@ -94,12 +87,14 @@ class Message {
 
     // retrieve type of message from APDU
     switch (this.apdu.pduType) {
-      case PDUType.UNCONFIRMED_SERVICE_REQUEST_PDU:
+      case PDUType.PDUType.UNCONFIRMED_SERVICE_REQUEST_PDU:
         // unconfirmed request
 
         switch (this.apdu.unconfirmedServiceChoice) {
-          case UnconfirmedServiceChoice.I_AM:
+          case UnconfirmedServiceChoice.UnconfirmedServiceChoice.I_AM:
             output += "I-AM ";
+
+            this.apdu.parseServiceParameters();
 
             // output object identifier
             var payload = this.apdu.serviceParameters[0].payload;
@@ -120,7 +115,7 @@ class Message {
 
             break;
 
-          case UnconfirmedServiceChoice.WHO_IS:
+          case UnconfirmedServiceChoice.UnconfirmedServiceChoice.WHO_IS:
             output += "WHO-IS, dataLength = " + this.dataLength;
             break;
 
@@ -133,7 +128,11 @@ class Message {
         }
         break;
 
-      case PDUType.COMPLEX_ACK_PDU:
+      case PDUType.PDUType.SIMPLE_ACK_PDU:
+        output += "SIMPLE_ACK_PDU ";
+        break;
+
+      case PDUType.PDUType.COMPLEX_ACK_PDU:
         output += "COMPLEX_ACK_PDU ";
         break;
 

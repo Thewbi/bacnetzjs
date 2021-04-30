@@ -1,6 +1,12 @@
-const ServiceParameter = require("./serviceparameter.js");
+const ServiceParameter = require("./serviceparameter.js").ServiceParameter;
 const PDUType = require("./pdutype.js");
-const UnconfirmedServiceChoice = require("./UnconfirmedServiceChoice.js");
+const UnconfirmedServiceChoice = require("./UnconfirmedServiceChoice.js")
+  .UnconfirmedServiceChoice;
+const unconfirmedServiceChoiceGetLabel = require("./UnconfirmedServiceChoice.js")
+  .getLabel;
+const confirmedServiceChoiceGetLabel = require("./ConfirmedServiceChoice.js")
+  .getLabel;
+const util = require("../common/util.js");
 
 class APDU {
   constructor() {
@@ -34,6 +40,7 @@ class APDU {
     this.unconfirmedServiceChoice = null;
     this.confirmedServiceChoice = null;
     this.serviceParameters = [];
+    this.payload = null;
   }
 
   get bytes() {
@@ -48,42 +55,35 @@ class APDU {
     apduTypeAndFlags <<= 4;
     apduTypeAndFlags |= this.segmentedResponseAccepted ? 0x02 : 0x00; // when missing -> abort:
     // segmentation-not-supported
-    //data[offset + index++] = (byte) (apduTypeAndFlags & 0xFF);
     data.writeUInt8(apduTypeAndFlags & 0xff, offset + index++);
 
     // 1 Byte: segmentation information
     if (
       this.segmentedResponseAccepted ||
-      this.pduType == PDUType.CONFIRMED_SERVICE_REQUEST_PDU
+      this.pduType == PDUType.PDUType.CONFIRMED_SERVICE_REQUEST_PDU
     ) {
-      //data[offset + index++] = (byte) (this.segmentationControl & 0xFF);
       data.writeUInt8(this.segmentationControl & 0xff, offset + index++);
     }
 
     // 1 Byte: invoke ID
     if (this.invokeId >= 0) {
-      //data[offset + index++] = (byte) this.invokeId;
       data.writeUInt8(this.invokeId, offset + index++);
     }
 
     // 1 Byte: sequence number
     if (this.sequenceNumber >= 0) {
-      //data[offset + index++] = (byte) this.sequenceNumber;
       data.writeUInt8(this.sequenceNumber, offset + index++);
     }
 
     // 1 Byte: proposed window size
     if (this.proposedWindowSize >= 0) {
-      //data[offset + index++] = (byte) this.proposedWindowSize;
       data.writeUInt8(this.proposedWindowSize, offset + index++);
     }
 
     // 1 Byte: service choice
     if (this.unconfirmedServiceChoice != null) {
-      //data[offset + index++] = (byte) this.unconfirmedServiceChoice.getId();
       data.writeUInt8(this.unconfirmedServiceChoice, offset + index++);
     } else if (this.confirmedServiceChoice != null) {
-      //data[offset + index++] = (byte) this.confirmedServiceChoice.getId();
       data.writeUInt8(this.confirmedServiceChoice, offset + index++);
     } else {
       throw "Either confirmedServiceChoice or unconfirmedServiceChoice is required!";
@@ -101,214 +101,246 @@ class APDU {
     return data;
   }
 
-  fromBytes(message, offset) {
+  fromBytes(data, offset) {
     // console.log(
     //   "APDU parsing from message " + message + " at offset " + offset
     // );
 
     // save original offset for later size computation, initialize current position
-    this.offset = offset;
-    this.currentPosition = offset;
+    let startIndex = 0;
+    let structureLength = 0;
+    //this.offset = offset;
+    //this.currentPosition = offset;
 
     // 1 byte - parse type and flags
-    this.pduType = message[offset + 0];
-    this.pduType = (this.pduType & 240) >> 4;
-    this.currentPosition++;
-
-    // 1 byte - invoke id
-
-    // 1 byte - parse service choice - how to decide whether this is confirmed or unconfirmed?
-    this.unconfirmedServiceChoice = message[offset + 1];
-    this.currentPosition++;
-
-    //console.log("APDU pduType " + this.pduType);
-    //console.log("APDU unconfirmedServiceChoice " + this.unconfirmedServiceChoice);
-
-    this.serviceParameters = [];
-
-    // read ServiceParameters until the end of the buffer
-    while (this.currentPosition < message.length) {
-      var serviceParameter = new ServiceParameter();
-
-      this.serviceParameters.push(serviceParameter);
-
-      serviceParameter.fromBytes(message, this.currentPosition);
-      this.currentPosition += serviceParameter.dataSizeInBuffer;
-    }
-  }
-
-  public void fromBytes(final byte[] data, final int startIndex, final int payloadLength) {
-
-    int offset = 0;
-    structureLength = 0;
 
     //
-    // PDU type
-
     // bits 7-4 are the PDU type
-    final int pduTypeBits = (data[startIndex + offset] & 0xF0) >> 4;
-    pduType = PDUType.fromInt(pduTypeBits);
+    this.pduType = data[offset + 0];
+    this.pduType = (this.pduType & 240) >> 4;
 
     //
     // PDU flags
 
     // bit 3 is the segmentation bit
-    segmentation = 0 < (data[startIndex + offset] & 0x08);
-//        if (segmentation) {
-//            // TODO: if there is segmentation, there are special segmentation bytes present
-//            // in the APDU that have to be parsed.
-//            throw new RuntimeException("Not implemented yet!");
-//        }
+    this.segmentation = 0 < (data[startIndex + offset] & 0x08);
 
     // bit 2 is the moreSegmentsFollow bit
-    moreSegmentsFollow = 0 < (data[startIndex + offset] & 0x04);
-//        if (moreSegmentsFollow) {
-//            throw new RuntimeException("Not implemented yet!");
-//        }
+    this.moreSegmentsFollow = 0 < (data[startIndex + offset] & 0x04);
 
     // bit 1 is the segmentedResponseAccepted bit
-    segmentedResponseAccepted = 0 < (data[startIndex + offset] & 0x02);
-    if (segmentedResponseAccepted) {
-        LOG.info("segmentedResponseAccepted bit");
-    }
+    this.segmentedResponseAccepted = 0 < (data[startIndex + offset] & 0x02);
 
     offset++;
     structureLength++;
+
+    //this.currentPosition++;
 
     // Response Information
     //
     // The ReadProperty request for max-apdu-length-accepted does not set the bit 2
     // but still contains segmentation information
-    if (segmentedResponseAccepted || pduType == PDUType.CONFIRMED_SERVICE_REQUEST_PDU) {
+    if (
+      this.segmentedResponseAccepted ||
+      this.pduType == PDUType.PDUType.CONFIRMED_SERVICE_REQUEST_PDU
+    ) {
+      this.segmentationControl = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
 
-        segmentationControl = data[startIndex + offset] & 0xFF;
-        offset++;
-        structureLength++;
+      // invoke ID
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
 
-        // invoke ID
-        invokeId = data[startIndex + offset] & 0xFF;
-        offset++;
-        structureLength++;
+      // unconfirmed service choice
+      let serviceChoiceCode = data[startIndex + offset] & 0xff;
+      this.confirmedServiceChoice = serviceChoiceCode;
+    } else if (this.pduType == PDUType.PDUType.SIMPLE_ACK_PDU) {
+      // invoke ID
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
 
-        // unconfirmed service choice
-        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
-        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
+      // confirmed service choice
+      let serviceChoiceCode = data[startIndex + offset] & 0xff;
+      this.confirmedServiceChoice = serviceChoiceCode;
+    } else if (this.pduType == PDUType.PDUType.COMPLEX_ACK_PDU) {
+      // this branch was introduced for parsing the response message of a
+      // read-property request towards a bacnet device object
 
-    } else if (pduType == PDUType.SIMPLE_ACK_PDU) {
+      // invoke ID
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
 
-        // invoke ID
-        invokeId = data[startIndex + offset] & 0xFF;
-        offset++;
-        structureLength++;
+      //
+      // SEGMENTATION SPECIFIC - START
+      //
 
-        // confirmed service choice
-        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
-        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
-
-    } else if (pduType == PDUType.COMPLEX_ACK_PDU) {
-
-        // this branch was introduced for parsing the response message of a
-        // read-property request towards a bacnet device object
-
-        // invoke ID
-        invokeId = data[startIndex + offset] & 0xFF;
-        offset++;
-        structureLength++;
-
-        //
-        // SEGMENTATION SPECIFIC - START
-        //
-
-        if (segmentation || moreSegmentsFollow) {
-
-            // sequence number
-            sequenceNumber = data[startIndex + offset] & 0xFF;
-            offset++;
-            structureLength++;
-
-            // proposed window size
-            proposedWindowSize = data[startIndex + offset] & 0xFF;
-            offset++;
-            structureLength++;
-        }
-
-        //
-        // SEGMENTATION SPECIFIC - STOP
-        //
-
-        // service choice
-        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
-        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
-
-    } else if (pduType == PDUType.ERROR_PDU) {
-
-        // invokeid
-        invokeId = data[startIndex + offset] & 0xFF;
-        offset++;
-        structureLength++;
-
-        // service choice
-        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
-        confirmedServiceChoice = ConfirmedServiceChoice.fromInt(serviceChoiceCode);
-        offset++;
-        structureLength++;
-
-        // read ServiceParameter ErrorClass
-        final ServiceParameter errorClassServiceParameter = new ServiceParameter();
-        int delta = errorClassServiceParameter.fromBytes(data, startIndex + offset);
-        offset += delta;
-        structureLength += delta;
-        serviceParameters.add(errorClassServiceParameter);
-
-        // read ServiceParameter ErrorCode
-        final ServiceParameter errorCodeServiceParameter = new ServiceParameter();
-        delta = errorCodeServiceParameter.fromBytes(data, startIndex + offset);
-        offset += delta;
-        structureLength += delta;
-        serviceParameters.add(errorCodeServiceParameter);
-
-        final ErrorClass errorClass = ErrorClass.fromInt(errorClassServiceParameter.getPayload()[0] & 0xFF);
-        final ErrorCode errorCode = ErrorCode.fromInt(errorCodeServiceParameter.getPayload()[0] & 0xFF);
-
-        LOG.error("Error detected! ErrorClass: " + errorClass + " ErrorCode: " + errorCode);
-
-        // no further processing
-        return;
-
-    } else if (pduType == PDUType.SIMPLE_ACK_PDU) {
-
-        // invokeid
-        invokeId = data[startIndex + offset] & 0xFF;
-        offset++;
-        structureLength++;
-
+      if (this.segmentation || this.moreSegmentsFollow) {
         // sequence number
-        sequenceNumber = data[startIndex + offset] & 0xFF;
+        this.sequenceNumber = data[startIndex + offset] & 0xff;
         offset++;
         structureLength++;
 
-        // proposedWindowSize
-        proposedWindowSize = data[startIndex + offset] & 0xFF;
+        // proposed window size
+        this.proposedWindowSize = data[startIndex + offset] & 0xff;
         offset++;
         structureLength++;
+      }
 
+      //
+      // SEGMENTATION SPECIFIC - STOP
+      //
+
+      // service choice
+      let serviceChoiceCode = data[startIndex + offset] & 0xff;
+      this.confirmedServiceChoice = serviceChoiceCode;
+    } else if (this.pduType == PDUType.PDUType.ERROR_PDU) {
+      // invokeid
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      // service choice
+      let serviceChoiceCode = data[startIndex + offset] & 0xff;
+      this.confirmedServiceChoice = serviceChoiceCode;
+      offset++;
+      structureLength++;
+
+      // read ServiceParameter ErrorClass
+      let errorClassServiceParameter = new ServiceParameter();
+      let delta = errorClassServiceParameter.fromBytes(
+        data,
+        startIndex + offset
+      );
+      this.serviceParameters.push(errorClassServiceParameter);
+      offset += delta;
+      structureLength += delta;
+
+      // read ServiceParameter ErrorCode
+      let errorCodeServiceParameter = new ServiceParameter();
+      delta = errorCodeServiceParameter.fromBytes(data, startIndex + offset);
+      this.serviceParameters.push(errorCodeServiceParameter);
+      offset += delta;
+      structureLength += delta;
+
+      let errorClass = ErrorClass.fromInt(
+        errorClassServiceParameter.getPayload()[0] & 0xff
+      );
+      let errorCode = ErrorCode.fromInt(
+        errorCodeServiceParameter.getPayload()[0] & 0xff
+      );
+
+      LOG.error(
+        "Error detected! ErrorClass: " + errorClass + " ErrorCode: " + errorCode
+      );
+
+      // no further processing
+      return;
+    } else if (this.pduType == PDUType.PDUType.SIMPLE_ACK_PDU) {
+      // invokeid
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      // sequence number
+      this.sequenceNumber = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      // proposedWindowSize
+      this.proposedWindowSize = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+    } else if (this.pduType == PDUType.PDUType.REJECT_PDU) {
+      console.log("REJECT - Request was rejected by communication partner!");
+
+      // invoke ID
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      // reject reason
+      this.rejectReason = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      switch (this.rejectReason) {
+        case 5:
+          console.log("REJECT REASON: missing-required-parameter");
+          break;
+
+        default:
+          console.log("UNKNOWN REJECT REASON: " + this.rejectReason);
+          throw "UNKNOWN REJECT REASON: " + this.rejectReason;
+          break;
+      }
     } else {
-
-        // unconfirmed service choice
-        final int serviceChoiceCode = data[startIndex + offset] & 0xFF;
-        unconfirmedServiceChoice = UnconfirmedServiceChoice.fromInt(serviceChoiceCode);
-
+      // unconfirmed service choice
+      let serviceChoiceCode = data[startIndex + offset] & 0xff;
+      this.unconfirmedServiceChoice = serviceChoiceCode;
     }
 
     offset++;
     structureLength++;
 
-    payload = Arrays.copyOfRange(data, startIndex + offset, payloadLength);
+    // copy the APDU payload (contains service parameters) to a internal buffer and
+    // do not parse them immediately because when a message is fragmented, several
+    // APDUs will arrive and their payloads have to be reassembled to parse
+    // all ServiceParameters for that particular fragmented response
+    let payloadLength = data.length - (startIndex + offset);
+    this.payload = Buffer.alloc(payloadLength);
 
-    LOG.info(Utils.bytesToHex(payload));
+    // buffer.copy(target, targetStart, sourceStart, sourceEnd);
+    data.copy(this.payload, 0, startIndex + offset, data.length);
 
-//        processPayload(data, startIndex, payloadLength, offset);
-}
+    // DEBUG
+    console.log(util.byteArrayToHexString(this.payload));
+
+    //payload = Arrays.copyOfRange(data, startIndex + offset, payloadLength);
+
+    //LOG.info(Utils.bytesToHex(payload));
+
+    // // 1 byte - parse service choice - how to decide whether this is confirmed or unconfirmed?
+    // this.unconfirmedServiceChoice = message[offset + 1];
+    // this.currentPosition++;
+
+    // //console.log("APDU pduType " + this.pduType);
+    // //console.log("APDU unconfirmedServiceChoice " + this.unconfirmedServiceChoice);
+
+    // this.serviceParameters = [];
+
+    // // read ServiceParameters until the end of the buffer
+    // while (this.currentPosition < message.length) {
+    //   var serviceParameter = new ServiceParameter();
+
+    //   this.serviceParameters.push(serviceParameter);
+
+    //   serviceParameter.fromBytes(message, this.currentPosition);
+    //   this.currentPosition += serviceParameter.dataSizeInBuffer;
+    // }
+  }
+
+  parseServiceParameters() {
+    if (this.payload == null) {
+      return;
+    }
+
+    let offset = 0;
+
+    // read ServiceParameters until the end of the buffer
+    while (offset < this.payload.length) {
+      var serviceParameter = new ServiceParameter();
+      this.serviceParameters.push(serviceParameter);
+
+      serviceParameter.fromBytes(this.payload, offset);
+      offset += serviceParameter.dataSizeInBuffer;
+
+      console.log(serviceParameter.asString);
+    }
+  }
 
   get dataSizeInBufferWithoutServiceParameters() {
     let dataLength = 0;
@@ -318,7 +350,7 @@ class APDU {
 
     if (
       this.segmentedResponseAccepted ||
-      this.pduType == PDUType.CONFIRMED_SERVICE_REQUEST_PDU
+      this.pduType == PDUType.PDUType.CONFIRMED_SERVICE_REQUEST_PDU
     ) {
       dataLength++;
     }
@@ -376,7 +408,18 @@ class APDU {
   }
 
   get asString() {
-    return "[APDU] pduType = " + PDUType.getLabel(this.pduType) + " (" + this.pduType + ") UnconfirmedServiceChoice: " + UnconfirmedServiceChoice.getLabel(this.unconfirmedServiceChoice) + " ConfirmedServiceChoice: " + this.confirmedServiceChoice;
+    return (
+      "[APDU] invokeId = " +
+      this.invokeId +
+      " pduType = " +
+      PDUType.getLabel(this.pduType) +
+      " (" +
+      this.pduType +
+      ") UnconfirmedServiceChoice: " +
+      unconfirmedServiceChoiceGetLabel(this.unconfirmedServiceChoice) +
+      " ConfirmedServiceChoice: " +
+      confirmedServiceChoiceGetLabel(this.confirmedServiceChoice)
+    );
   }
 }
 
