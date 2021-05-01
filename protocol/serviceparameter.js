@@ -147,6 +147,15 @@ class ServiceParameter {
       // APPLICATION tags
       //
       switch (this.tagNumber) {
+        // 0x00
+        case ServiceParameterConstants.APPLICATION_TAG_NULL:
+          //var payload = message[offset + 1] & 0xff;
+          //   console.log(
+          //     ">>>>> BOOLEAN. The boolean value is = " +
+          //       (this.lengthValueType == 1 ? "TRUE" : "FALSE")
+          //   );
+          break;
+
         // 0x01
         case ServiceParameterConstants.APPLICATION_TAG_BOOLEAN:
           var payload = message[offset + 1] & 0xff;
@@ -187,7 +196,8 @@ class ServiceParameter {
         // 0x09
         case ServiceParameterConstants.ENUMERATED_CODE:
           //   console.log(">>>>> ENUMERATED_CODE");
-          var payload = message[offset + 1] & 0xff;
+          //var payload = message[offset + 1] & 0xff;
+          this.payload = message.slice(offset + 1, offset + 1 + 1);
           //   console.log(
           //     "The value of this enum is: " +
           //       payload +

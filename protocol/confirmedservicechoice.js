@@ -85,8 +85,8 @@ function getLabel(confirmedServiceChoice) {
       return "READ_PROPERTY_MULTIPLE";
     case ConfirmedServiceChoice.readRange:
       return "readRange";
-    case WRITE_PROPERTY:
-      return "WRITE_PROPERTY";
+    case ConfirmedServiceChoice.WRITE_PROPERTY:
+      return "";
     case ConfirmedServiceChoice.writePropertyMultiple:
       return "writePropertyMultiple";
 

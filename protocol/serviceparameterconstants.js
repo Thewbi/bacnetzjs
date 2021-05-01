@@ -47,6 +47,9 @@ const ServiceParameterConstants = {
   /** 0x0B */
   TIME: 0x0b,
 
+  /** 0x00 */
+  APPLICATION_TAG_NULL: 0x00,
+
   /** 0x01 */
   APPLICATION_TAG_BOOLEAN: 0x01,
 

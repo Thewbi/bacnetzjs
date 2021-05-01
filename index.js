@@ -390,10 +390,22 @@ function writeProperty(objectType, bacnetIdentifier, value) {
   );
 }
 
-// unlock TZ320
-writeProperty(19, 4, 0x02); // 19 = multi-state-value, 4 = bacnet instance number
-// lock TZ320
+// 0x00 - ERROR: value out of range
+//writeProperty(19, 4, 0x00);
+
+// 0x01 - no command (Nothing happens when this value is written to the property)
+//writeProperty(19, 4, 0x01);
+
+// 0x02 - unlock TZ320
+//writeProperty(19, 4, 0x02); // 19 = multi-state-value, 4 = bacnet instance number
+
+// 0x03 - lock TZ320
 //writeProperty(19, 4, 0x03); // 19 = multi-state-value, 4 = bacnet instance number
+
+// 0x04 -  Kurzzeitfreigabe TZ320 (For the KZF to actually activate, the lock has to be in locked state)
+writeProperty(19, 4, 0x04); // 19 = multi-state-value, 4 = bacnet instance number
+//writeProperty(19, 4, 0x02);
+//writeProperty(19, 4, 0x03);
 
 // stackoverflow.com/questions/6177423/send-broadcast-datagram
 https: function broadcastNew() {

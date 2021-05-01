@@ -6,6 +6,8 @@ const unconfirmedServiceChoiceGetLabel = require("./UnconfirmedServiceChoice.js"
   .getLabel;
 const confirmedServiceChoiceGetLabel = require("./ConfirmedServiceChoice.js")
   .getLabel;
+const ErrorClass = require("./errorclass.js");
+const ErrorCode = require("./errorcode.js");
 const util = require("../common/util.js");
 
 class APDU {
@@ -217,30 +219,31 @@ class APDU {
 
       // read ServiceParameter ErrorClass
       let errorClassServiceParameter = new ServiceParameter();
-      let delta = errorClassServiceParameter.fromBytes(
-        data,
-        startIndex + offset
-      );
+      errorClassServiceParameter.fromBytes(data, startIndex + offset);
       this.serviceParameters.push(errorClassServiceParameter);
-      offset += delta;
-      structureLength += delta;
+      offset += 2;
+      structureLength += 2;
 
       // read ServiceParameter ErrorCode
       let errorCodeServiceParameter = new ServiceParameter();
-      delta = errorCodeServiceParameter.fromBytes(data, startIndex + offset);
+      errorCodeServiceParameter.fromBytes(data, startIndex + offset);
       this.serviceParameters.push(errorCodeServiceParameter);
-      offset += delta;
-      structureLength += delta;
+      offset += 2;
+      structureLength += 2;
 
-      let errorClass = ErrorClass.fromInt(
-        errorClassServiceParameter.getPayload()[0] & 0xff
-      );
-      let errorCode = ErrorCode.fromInt(
-        errorCodeServiceParameter.getPayload()[0] & 0xff
-      );
+      let errorClass = errorClassServiceParameter.payload[0] & 0xff;
+      let errorCode = errorCodeServiceParameter.payload[0] & 0xff;
 
-      LOG.error(
-        "Error detected! ErrorClass: " + errorClass + " ErrorCode: " + errorCode
+      console.log(
+        "Error detected! ErrorClass: " +
+          ErrorClass.getLabel(errorClass) +
+          " (" +
+          errorClass +
+          ") ErrorCode: " +
+          ErrorCode.getLabel(errorCode) +
+          " (" +
+          errorCode +
+          ")"
       );
 
       // no further processing
@@ -326,7 +329,7 @@ class APDU {
     data.copy(this.payload, 0, startIndex + offset, data.length);
 
     // DEBUG
-    console.log(util.byteArrayToHexString(this.payload));
+    //console.log(util.byteArrayToHexString(this.payload));
 
     //payload = Arrays.copyOfRange(data, startIndex + offset, payloadLength);
 

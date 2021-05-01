@@ -134,7 +134,7 @@ function getLabel(objectType) {
       return "MULTI_STATE_VALUE";
 
     default:
-      return "UKNOWN";
+      return "UNKNOWN";
   }
 }
 
