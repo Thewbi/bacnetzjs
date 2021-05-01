@@ -98,7 +98,7 @@ function getLabel(unconfirmedServiceChoice) {
       return "DEVICE_COMMUNICATION_CONTROL";
 
     default:
-      return "UNKNOWN UnconfirmedServiceChoice " + confirmedServiceChoice;
+      return "UNKNOWN UnconfirmedServiceChoice " + unconfirmedServiceChoice;
   }
 }
 

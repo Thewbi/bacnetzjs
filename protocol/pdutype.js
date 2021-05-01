@@ -8,6 +8,7 @@ const PDUType = {
   SEGMENT_ACK_PDU: 0x04,
   ERROR_PDU: 0x05,
   REJECT_PDU: 0x06,
+  ABORT_PDU: 0x07,
 };
 
 function getLabel(pduType) {
@@ -36,6 +37,9 @@ function getLabel(pduType) {
 
     case PDUType.REJECT_PDU:
       return "REJECT_PDU";
+
+    case PDUType.ABORT_PDU:
+      return "ABORT_PDU";
 
     default:
       return "UKNOWN";

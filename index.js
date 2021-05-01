@@ -18,19 +18,19 @@ const util = require("./common/util.js");
 
 // loytec local lan
 //var DESTINATION_PORT = 47808;
-//var DESTINATION_ADDRESS = "192.168.2.10";
+var DESTINATION_ADDRESS = "192.168.2.10";
 
 // WAGO local lan
 var DESTINATION_PORT = 47808;
-var DESTINATION_ADDRESS = "192.168.26.154";
+//var DESTINATION_ADDRESS = "192.168.26.154";
 
-// broadcast local lan
+// broadcast loytec local lan
 //var BROADCAST_LISTENING_PORT = 47808;
-//var BROADCAST_ADDR = "192.168.2.255";
+var BROADCAST_ADDR = "192.168.2.255";
 
 // for WAGO 750-831
 var BROADCAST_LISTENING_PORT = 47808;
-var BROADCAST_ADDR = "192.168.26.255";
+//var BROADCAST_ADDR = "192.168.26.255";
 
 // sends broadcast messages
 var server = dgram.createSocket("udp4");
@@ -204,6 +204,7 @@ function requestObjectList(objectType, bacnetIdentifier) {
   );
 }
 
+//requestObjectList(8, 10000);
 //requestObjectList(8, 1000);
 
 function requestAllProperties(objectType, bacnetIdentifier) {
@@ -219,14 +220,15 @@ function requestAllProperties(objectType, bacnetIdentifier) {
 
   // add handlers first, before sending a request
   socket.on("message", function (message, remoteInfo) {
-    console.log(
-      "Response from " +
-        remoteInfo.address +
-        ":" +
-        remoteInfo.port +
-        " - " +
-        util.byteArrayToHexString(message)
-    );
+    // DEBUG - output the raw data
+    // console.log(
+    //   "Response from " +
+    //     remoteInfo.address +
+    //     ":" +
+    //     remoteInfo.port +
+    //     " - " +
+    //     util.byteArrayToHexString(message)
+    // );
 
     // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
 
@@ -251,9 +253,11 @@ function requestAllProperties(objectType, bacnetIdentifier) {
     bacnetMessage.npdu = npdu;
     bacnetMessage.apdu = apdu;
 
-    console.log("Incoming Message as String: " + bacnetMessage.asString);
+    //console.log("Incoming Message as String: " + bacnetMessage.asString);
 
     bacnetMessage.parseServiceParameters();
+
+    console.log(bacnetMessage.asString);
   });
 
   let deviceObject = new DeviceObject();
@@ -287,7 +291,109 @@ function requestAllProperties(objectType, bacnetIdentifier) {
   );
 }
 
-requestAllProperties(17, 0);
+// object-type: device (8) - bacnet identifier: 25
+// object-type: multistate value (19) - bacnet identifier: 1 - name: 'module_type' - Present Value can not be written! module_type is the value that the IO420 was configured as using the ST220 (Service Terminal 220)
+// object-type: multistate value (19) - bacnet identifier: 2 - name: 'alarm_TZ320'
+// object-type: multistate value (19) - bacnet identifier: 3 - name: 'TZ320_state'
+// object-type: multistate value (19) - bacnet identifier: 4 - name: 'TZ320_command'
+// object-type: binary-input (3) - bacnet identifier: 1 - name: 'lock-state' - why is the name of a binary-input 'lock-state'? (Setting the Out Of Service mode is possible)
+// object-type: binary-input (3) - bacnet identifier: 2 - name: 'close-state' - why is the name of a binary-input 'close-state'? (Setting the Out Of Service mode is possible
+// object-type: notification-class (15) - bacnet identifier: 40 - What does this do?
+
+//requestAllProperties(8, 25); // only works with destination specifier in NPDU!
+//requestAllProperties(19, 1); // object type: multistate value (19)
+//requestAllProperties(19, 2); // object type: multistate value (19)
+//requestAllProperties(19, 3); // object type: multistate value (19)
+//requestAllProperties(19, 4); // object type: multistate value (19)
+//requestAllProperties(8, 10000); // only works with destination specifier in NPDU!
+//requestAllProperties(17, 0);
+
+function writeProperty(objectType, bacnetIdentifier, value) {
+  var socket = dgram.createSocket("udp4");
+
+  // add handlers first, before sending a request
+  socket.on("listening", function () {
+    var address = socket.address();
+    console.log(
+      "UDP Server listening on " + address.address + ":" + address.port
+    );
+  });
+
+  // add handlers first, before sending a request
+  socket.on("message", function (message, remoteInfo) {
+    // DEBUG - output the raw data
+    // console.log(
+    //   "Response from " +
+    //     remoteInfo.address +
+    //     ":" +
+    //     remoteInfo.port +
+    //     " - " +
+    //     util.byteArrayToHexString(message)
+    // );
+
+    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+
+    var offset = 0;
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.fromBytes(message, offset);
+    offset += virtualLinkControl.dataSizeInBuffer;
+
+    var npdu = new NPDU();
+    npdu.fromBytes(message, offset);
+    offset += npdu.dataSizeInBuffer;
+
+    var apdu = new APDU();
+    apdu.fromBytes(message, offset);
+    offset += apdu.dataSizeInBuffer;
+
+    // incoming BACNet message
+    var bacnetMessage = new Message();
+    bacnetMessage.remoteInfo = remoteInfo;
+    bacnetMessage.virtualLinkControl = virtualLinkControl;
+    bacnetMessage.npdu = npdu;
+    bacnetMessage.apdu = apdu;
+
+    //console.log("Incoming Message as String: " + bacnetMessage.asString);
+
+    bacnetMessage.parseServiceParameters();
+
+    console.log(bacnetMessage.asString);
+  });
+
+  let deviceObject = new DeviceObject();
+  deviceObject.objectType = objectType;
+  deviceObject.bacnetIdentifier = bacnetIdentifier;
+
+  let messageFactory = new MessageFactory();
+  let message = messageFactory.writeProperty(deviceObject, value);
+
+  let offset = 0;
+
+  let payload = message.bytes;
+
+  // send a request and keep the socket open so the response can be retrieved
+  socket.send(
+    payload,
+    offset,
+    payload.length,
+    DESTINATION_PORT,
+    DESTINATION_ADDRESS,
+    function () {
+      console.log(
+        "Sent '" +
+          util.byteArrayToHexString(payload) +
+          "' Length = " +
+          payload.length
+      );
+    }
+  );
+}
+
+// unlock TZ320
+writeProperty(19, 4, 0x02); // 19 = multi-state-value, 4 = bacnet instance number
+// lock TZ320
+//writeProperty(19, 4, 0x03); // 19 = multi-state-value, 4 = bacnet instance number
 
 // stackoverflow.com/questions/6177423/send-broadcast-datagram
 https: function broadcastNew() {

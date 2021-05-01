@@ -22,6 +22,7 @@ const ConfirmedServiceChoice = {
   READ_PROPERTY: 12,
   READ_PROPERTY_MULTIPLE: 14,
   readRange: 26,
+  /** 0x0F */
   WRITE_PROPERTY: 15,
   writePropertyMultiple: 16,
 

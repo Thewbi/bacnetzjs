@@ -1,10 +1,12 @@
 class NPDU {
   constructor() {
-    this.destinationNetworkNumber = 0;
     this.sourceMacLayerAddressLength = 0;
     this.sourceMac = 0;
+    this.sourceAddress = 0;
     this.destinationMac = 0;
-    this.destinationMACLayerAddressLength = 0;
+    this.destinationNetworkAddress = 0;
+    this.destinationMacLayerAddressLength = 0;
+    this.destinationAddress = 0;
     this.destinationHopCount = 0;
   }
 
@@ -25,26 +27,30 @@ class NPDU {
     data.writeUInt8(this.control, offset + index++);
 
     if (this.isDestinationSpecifierPresent) {
-      // 2 byte destination network number
-      //APIUtils.addShortToBuffer(data, offset + index, (short) destinationNetworkNumber);
-      data.writeUInt16BE(this.destinationNetworkNumber, offset + index);
+      // 2 byte - destination network number
+      //APIUtils.addShortToBuffer(data, offset + index, (short) destinationNetworkAddress);
+      data.writeUInt16BE(this.destinationNetworkAddress, offset + index);
       index += 2;
 
-      //data[offset + index++] = (byte) destinationMACLayerAddressLength;
-      data.writeUInt16BE(
-        this.destinationMACLayerAddressLength,
-        offset + index++
-      );
-      if (this.destinationMACLayerAddressLength > 0) {
-        for (let i = 0; i < this.destinationMACLayerAddressLength; i++) {
-          //   data[offset + index++] = byte(
-          //     (this.destinationMac >>
-          //       (8 * (this.destinationMACLayerAddressLength - 1 - i))) &
-          //       0xff
-          //   );
-        }
-      }
+      // 1 byte - destinationMacLayerAddressLength
+      //data[offset + index++] = (byte) destinationMacLayerAddressLength;
+      data.writeUInt8(this.destinationMacLayerAddressLength, offset + index++);
 
+      // this.destinationMacLayerAddressLength bytes - destination address
+      //   if (this.destinationMacLayerAddressLength > 0) {
+      //     for (let i = 0; i < this.destinationMacLayerAddressLength; i++) {
+      //       //   data[offset + index++] = byte(
+      //       //     (this.destinationMac >>
+      //       //       (8 * (this.destinationMacLayerAddressLength - 1 - i))) &
+      //       //       0xff
+      //       //   );
+      //     }
+      //   }
+
+      // TODO FIX THIS! THE ADDRESS HAS VARIABLE LENGTH!: destination address
+      data.writeUInt8(this.destinationAddress, offset + index++);
+
+      // 1 byte - hop count
       //data[offset + index++] = (byte) destinationHopCount;
       data.writeUInt8(this.destinationHopCount, offset + index++);
     }
@@ -55,15 +61,22 @@ class NPDU {
       data.writeUInt16BE(this.sourceNetworkAddress, offset + index);
       index += 2;
 
+      // 1 byte source MAC layer address length
       //data[offset + index++] = (byte) this.sourceMacLayerAddressLength;
       data.writeUInt8(this.sourceMacLayerAddressLength, offset + index++);
-      if (this.sourceMacLayerAddressLength > 0) {
-        for (let i = 0; i < sourceMacLayerAddressLength; i++) {
-          //   data[offset + index++] = byte(
-          //     (sourceMac >> (8 * (sourceMacLayerAddressLength - 1 - i))) & 0xff
-          //   );
-        }
-      }
+
+      // this.sourceMacLayerAddressLength bytes - source address
+      //if (this.sourceMacLayerAddressLength > 0) {
+      // for (let i = 0; i < sourceMacLayerAddressLength; i++) {
+      //   //   data[offset + index++] = byte(
+      //   //     (sourceMac >> (8 * (sourceMacLayerAddressLength - 1 - i))) & 0xff
+      //   //   );
+      // }
+      //}
+
+      // TODO FIX THIS! THE ADDRESS HAS VARIABLE LENGTH!
+      // this.sourceMacLayerAddressLength bytes - source address
+      data.writeUInt8(this.sourceAddress, offset + index++);
     }
 
     return data;
@@ -76,17 +89,25 @@ class NPDU {
 
     this.version = message[offset + 0];
     this.control = message[offset + 1];
-    this.destinationNetwork =
-      ((message[offset + 2] & 0xff) << 8) | (message[offset + 3] & 0xff);
-    this.destinationMACLayerAddressLength = message[offset + 4];
-    this.hopCount = message[offset + 5];
+
+    if (this.isSourceSpecifierPresent) {
+      this.sourceNetworkAddress =
+        ((message[offset + 2] & 0xff) << 8) | (message[offset + 3] & 0xff);
+      this.sourceMacLayerAddressLength = message[offset + 4];
+      this.sourceAddress = message[offset + 5];
+    } else if (this.isDestinationSpecifierPresent) {
+      this.destinationNetwork =
+        ((message[offset + 2] & 0xff) << 8) | (message[offset + 3] & 0xff);
+      this.destinationMacLayerAddressLength = message[offset + 4];
+      this.hopCount = message[offset + 5];
+    }
 
     // console.log("NPDU version " + this.version);
     // console.log("NPDU control " + this.control);
     // console.log("NPDU destinationNetwork " + this.destinationNetwork);
     // console.log(
-    //   "NPDU destinationMACLayerAddressLength " +
-    //     this.destinationMACLayerAddressLength
+    //   "NPDU destinationMacLayerAddressLength " +
+    //     this.destinationMacLayerAddressLength
     // );
     // console.log("NPDU hopCount " + this.hopCount);
   }
@@ -134,7 +155,7 @@ class NPDU {
       dataLength += 1;
 
       // n bytes: for the mac itself
-      dataLength += this.destinationMACLayerAddressLength;
+      dataLength += this.destinationMacLayerAddressLength;
 
       // 1 byte: hopCount
       dataLength += 1;
@@ -148,17 +169,15 @@ class NPDU {
       dataLength += 1;
 
       // n bytes: for the mac itself
-      dataLength += this.destinationMACLayerAddressLength;
-
-      // 1 byte: hopCount
-      //			dataLength += 1;
+      dataLength += this.sourceMacLayerAddressLength;
     }
 
     return dataLength;
   }
+
   get dataLength() {
-    //return this.dataSizeInBuffer;
-    return 1;
+    return this.dataSizeInBuffer;
+    //return 1;
   }
 }
 

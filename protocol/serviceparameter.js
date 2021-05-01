@@ -81,18 +81,18 @@ class ServiceParameter {
         // 0x01
         case ServiceParameterConstants.PROPERTY_IDENTIFIER_CODE:
           var payload = message[offset + 1] & 0xff;
-          console.log(
-            ">>>>> PROPERTY_IDENTIFIER_CODE of property " +
-              DevicePropertyType.getLabel(payload) +
-              " (" +
-              payload +
-              ")"
-          );
+          //   console.log(
+          //     ">>>>> PROPERTY_IDENTIFIER_CODE of property " +
+          //       DevicePropertyType.getLabel(payload) +
+          //       " (" +
+          //       payload +
+          //       ")"
+          //   );
           break;
 
         // 0x04
         case ServiceParameterConstants.OBJECT_IDENTIFIER_CODE:
-          console.log(">>>>> OBJECT_IDENTIFIER_CODE");
+          //   console.log(">>>>> OBJECT_IDENTIFIER_CODE");
           var data =
             ((message[offset + 1] & 0xff) << 24) |
             ((message[offset + 2] & 0xff) << 16) |
@@ -128,18 +128,18 @@ class ServiceParameter {
 
         // 0x06
         case ServiceParameterConstants.OPENING_TAG_CODE:
-          console.log(">>>>> OPENING_TAG_CODE");
+          //   console.log(">>>>> OPENING_TAG_CODE {[" + this.tagNumber + "]");
           break;
 
         // 0x07
         case ServiceParameterConstants.CLOSING_TAG_CODE:
-          console.log(">>>>> CLOSING_TAG_CODE");
+          //   console.log(">>>>> CLOSING_TAG_CODE {[" + this.tagNumber + "]");
           break;
 
         default:
-          console.log(
-            "Unknown CONTEXT_TAG! lengthValueType = " + this.lengthValueType
-          );
+          //   console.log(
+          //     "Unknown CONTEXT_TAG! lengthValueType = " + this.lengthValueType
+          //   );
           break;
       }
     } else if (this.tagClass == TagClass.APPLICATION_TAG) {
@@ -147,55 +147,63 @@ class ServiceParameter {
       // APPLICATION tags
       //
       switch (this.tagNumber) {
-        // 0x02
+        // 0x01
         case ServiceParameterConstants.APPLICATION_TAG_BOOLEAN:
           var payload = message[offset + 1] & 0xff;
-          console.log(
-            ">>>>> BOOLEAN. The boolean value is = " +
-              (this.lengthValueType == 1 ? "TRUE" : "FALSE")
-          );
+          //   console.log(
+          //     ">>>>> BOOLEAN. The boolean value is = " +
+          //       (this.lengthValueType == 1 ? "TRUE" : "FALSE")
+          //   );
           break;
 
         // 0x02
         case ServiceParameterConstants.UNSIGNED_INTEGER_CODE:
           var payload = message[offset + 1] & 0xff;
-          console.log(
-            ">>>>> UNSIGNED INTEGER. The unsigned integer value is = " + payload
-          );
+          //   console.log(
+          //     ">>>>> UNSIGNED INTEGER. The unsigned integer value is = " + payload
+          //   );
           break;
 
         // 0x07
         case ServiceParameterConstants.CHARACTER_STRING_CODE:
           // the length of the contained payload is store in the first byte
           var payloadLength = message[offset + 1] & 0xff;
-          console.log(
-            ">>>>> EXTENDED_TAG_CODE the payload length to read is: " +
-              payloadLength
-          );
+          //   console.log(
+          //     ">>>>> EXTENDED_TAG_CODE the payload length to read is: " +
+          //       payloadLength
+          //   );
 
+          // TODO: store this value somewhere maybe?
           // consume the bytes that this extended tag contains
           let targetBuffer = Buffer.alloc(payloadLength);
           message.copy(targetBuffer, 0, offset + 2, offset + 2 + payloadLength);
-          console.log(targetBuffer.toString());
+
+          // DEBUG output the value
+          //console.log(targetBuffer.toString());
 
           this.payload = message.slice(offset + 2, offset + 2 + payloadLength);
           break;
 
         // 0x09
         case ServiceParameterConstants.ENUMERATED_CODE:
-          console.log(">>>>> ENUMERATED_CODE");
+          //   console.log(">>>>> ENUMERATED_CODE");
           var payload = message[offset + 1] & 0xff;
-          console.log("The value of this enum is: " + payload);
+          //   console.log(
+          //     "The value of this enum is: " +
+          //       payload +
+          //       "! This value only makes sense in the context of the property identifier service parameter preceding it! The preceding property identifier determines which value is mapped to this enum key! For ObjectType: " +
+          //       ObjectType.getLabel(payload)
+          //   );
           break;
 
         // 0x0a
         case ServiceParameterConstants.DATE:
-          console.log(">>>>> DATE");
+          //   console.log(">>>>> DATE");
           break;
 
         // 0x0b
         case ServiceParameterConstants.TIME:
-          console.log(">>>>> TIME");
+          //   console.log(">>>>> TIME");
           break;
 
         // 0x0c = 12d
@@ -209,12 +217,15 @@ class ServiceParameter {
           var objectType = (data & (1023 << 22)) >> 22;
           var bacnetIdentifier = (data & (4194303 << 0)) >> 0;
 
-          console.log(
-            ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
-              objectType +
-              " bacnetIdentifier = " +
-              bacnetIdentifier
-          );
+          //   console.log(
+          //     ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
+          //       ObjectType.getLabel(objectType) +
+          //       " (" +
+          //       objectType +
+          //       ") " +
+          //       " bacnetIdentifier = " +
+          //       bacnetIdentifier
+          //   );
 
           // copy payload from buffer over into the service parameter
           this.payload = message.slice(
@@ -224,7 +235,7 @@ class ServiceParameter {
           break;
 
         case ServiceParameterConstants.APPLICATION_TAG_NUMBER_BIT_STRING:
-          console.log(">>>>> BIT_STRING");
+          //   console.log(">>>>> BIT_STRING");
           break;
 
         default:
@@ -264,6 +275,10 @@ class ServiceParameter {
         data += "[APPLICATION_TAG]";
 
         switch (this.tagNumber) {
+          case ServiceParameterConstants.BIT_STRING_CODE:
+            data += "BIT STRING";
+            break;
+
           case ServiceParameterConstants.APPLICATION_TAG_BOOLEAN:
             data += "BOOLEAN";
             break;
@@ -296,6 +311,7 @@ class ServiceParameter {
             //stringBuffer.append("Enumerated (9)");
             break;
 
+          // 0x12
           case ServiceParameterConstants.BACNET_OBJECT_IDENTIFIER:
             //stringBuffer.append("BACnetObjectIdentifier (12)");
             // the first ten bit contain the type of object this object identifier describes
@@ -415,12 +431,12 @@ class ServiceParameter {
             var objectType = (oi & (1023 << 22)) >> 22;
             var bacnetIdentifier = (oi & (4194303 << 0)) >> 0;
 
-            console.log(
-              "objectType " +
-                objectType +
-                " bacnetIdentifier " +
-                bacnetIdentifier
-            );
+            // console.log(
+            //   "objectType " +
+            //     objectType +
+            //     " bacnetIdentifier " +
+            //     bacnetIdentifier
+            // );
 
             break;
 

@@ -14,7 +14,8 @@ class APDU {
     this.invokeId = -1;
     this.sequenceNumber = -1;
     this.proposedWindowSize = -1;
-    this.segmentedResponseAccepted = false;
+    //this.segmentedResponseAccepted = false;
+    this.segmentedResponseAccepted = true;
     /**
      * upper nibble = max response segments accepted <br />
      * <br />
@@ -36,7 +37,8 @@ class APDU {
      * As a default use a max response segments accepted of 16 and maximum ADPU size
      * accepted of (1476 Octets) (= 5d)
      */
-    this.segmentationControl = (16 << 4) | 5;
+    this.segmentationControl = (7 << 4) | 5;
+
     this.unconfirmedServiceChoice = null;
     this.confirmedServiceChoice = null;
     this.serviceParameters = [];
@@ -53,8 +55,7 @@ class APDU {
     // 1 Byte: APDU Type and APDU Flags
     let apduTypeAndFlags = this.pduType;
     apduTypeAndFlags <<= 4;
-    apduTypeAndFlags |= this.segmentedResponseAccepted ? 0x02 : 0x00; // when missing -> abort:
-    // segmentation-not-supported
+    apduTypeAndFlags |= this.segmentedResponseAccepted ? 0x02 : 0x00;
     data.writeUInt8(apduTypeAndFlags & 0xff, offset + index++);
 
     // 1 Byte: segmentation information
@@ -102,6 +103,11 @@ class APDU {
   }
 
   fromBytes(data, offset) {
+    // data contains:
+    // 4 byte Virtual Link Control
+    // ? byte NPDU (variable length because of source and destination network descriptors)
+    // ? byte APDU (variable length because of service parameters)
+
     // console.log(
     //   "APDU parsing from message " + message + " at offset " + offset
     // );
@@ -269,13 +275,36 @@ class APDU {
 
       switch (this.rejectReason) {
         case 5:
-          console.log("REJECT REASON: missing-required-parameter");
-          break;
+          let msg = "REJECT REASON: missing-required-parameter (5)";
+          console.log(msg);
+          throw msg;
 
         default:
           console.log("UNKNOWN REJECT REASON: " + this.rejectReason);
           throw "UNKNOWN REJECT REASON: " + this.rejectReason;
-          break;
+      }
+    } else if (this.pduType == PDUType.PDUType.ABORT_PDU) {
+      console.log("REJECT - Request was rejected by communication partner!");
+
+      // invoke ID
+      this.invokeId = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      // abort reason
+      this.abortReason = data[startIndex + offset] & 0xff;
+      offset++;
+      structureLength++;
+
+      switch (this.abortReason) {
+        case 4:
+          let msg = "ABORT REASON: segmentation-not-supported (4)";
+          console.log(msg);
+          throw msg;
+
+        default:
+          console.log("UNKNOWN ABORT REASON: " + this.rejectReason);
+          throw "UNKNOWN ABORT REASON: " + this.rejectReason;
       }
     } else {
       // unconfirmed service choice
@@ -328,6 +357,7 @@ class APDU {
       return;
     }
 
+    // 1 byte service choice, 1 byte invoke id before the service parameters start
     let offset = 0;
 
     // read ServiceParameters until the end of the buffer
@@ -338,7 +368,8 @@ class APDU {
       serviceParameter.fromBytes(this.payload, offset);
       offset += serviceParameter.dataSizeInBuffer;
 
-      console.log(serviceParameter.asString);
+      // DEBUG output the parsed service parameter
+      //console.log(serviceParameter.asString);
     }
   }
 
@@ -408,18 +439,34 @@ class APDU {
   }
 
   get asString() {
-    return (
-      "[APDU] invokeId = " +
-      this.invokeId +
+    let result = "";
+    let invokeIdAsString = " invokeId = " + this.invokeId;
+
+    let pduTypeAsString =
       " pduType = " +
       PDUType.getLabel(this.pduType) +
       " (" +
       this.pduType +
-      ") UnconfirmedServiceChoice: " +
-      unconfirmedServiceChoiceGetLabel(this.unconfirmedServiceChoice) +
+      ")";
+
+    let unconfirmed =
+      " UnconfirmedServiceChoice: " +
+      unconfirmedServiceChoiceGetLabel(this.unconfirmedServiceChoice);
+
+    let confirmed =
       " ConfirmedServiceChoice: " +
-      confirmedServiceChoiceGetLabel(this.confirmedServiceChoice)
-    );
+      confirmedServiceChoiceGetLabel(this.confirmedServiceChoice);
+
+    result +=
+      "[APDU] " + invokeIdAsString + pduTypeAsString + unconfirmed + confirmed;
+
+    for (let i = 0; i < this.serviceParameters.length; i++) {
+      //console.log(this.serviceParameters[i].asString);
+      result += this.serviceParameters[i].asString;
+      result += "\n";
+    }
+
+    return result;
   }
 }
 
