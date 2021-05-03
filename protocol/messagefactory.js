@@ -324,6 +324,169 @@ class MessageFactory {
 
     return outMessage;
   }
+
+  subscribeCOV(deviceObject, invokeId, subscriptionLifetimeInSeconds) {
+    //
+    // Virtual Link Control
+    //
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.type = 0x81;
+    virtualLinkControl.function = 0x0a;
+    // is set later, when the full package data was added
+    virtualLinkControl.length = 0x00;
+
+    //
+    // NPDU including destination network information
+    //
+
+    var outNpdu = new NPDU();
+    outNpdu.version = 0x01;
+    // no additional information
+    // this works, if the cp is connected to the device directly via 192.168.2.1
+    //outNpdu.control = 0x00;
+    // destination specifier
+    outNpdu.control = 0x24;
+    outNpdu.destinationNetworkAddress = 999;
+    outNpdu.destinationMacLayerAddressLength = 1;
+    outNpdu.destinationAddress = 25;
+    outNpdu.destinationHopCount = 255;
+
+    //
+    // APDU
+    //
+
+    // subscriber process id ( 0x01 is set as the id )
+    let subscriberProcessIdServiceParameter = new ServiceParameter();
+    subscriberProcessIdServiceParameter.tagClass =
+      TagClass.CONTEXT_SPECIFIC_TAG;
+    subscriberProcessIdServiceParameter.tagNumber = 0x00;
+    subscriberProcessIdServiceParameter.lengthValueType = 0x01;
+    subscriberProcessIdServiceParameter.payload = Buffer.alloc(1);
+    // the id of the subscriber
+    subscriberProcessIdServiceParameter.payload.writeUInt8(0x01);
+    //subscriberProcessIdServiceParameter.setPayload(new byte[] { (byte) 0x01 });
+
+    // this object identifier has to be context specific. I do not know why
+    let objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    objectIdentifierServiceParameter.tagNumber = 0x01;
+    objectIdentifierServiceParameter.lengthValueType =
+      ServiceParameterConstants.ServiceParameterConstants.OBJECT_IDENTIFIER_CODE;
+    objectIdentifierServiceParameter.objectType = deviceObject.objectType;
+    objectIdentifierServiceParameter.bacnetIdentifier =
+      deviceObject.bacnetIdentifier;
+
+    // issue confirmed notifications (0x00 == FALSE)
+    let confirmedNotificationsServiceParameter = new ServiceParameter();
+    confirmedNotificationsServiceParameter.tagClass =
+      TagClass.CONTEXT_SPECIFIC_TAG;
+    confirmedNotificationsServiceParameter.tagNumber = 0x02;
+    confirmedNotificationsServiceParameter.lengthValueType = 0x01;
+    confirmedNotificationsServiceParameter.payload = Buffer.alloc(1);
+    // send unconfirmed notifications
+    confirmedNotificationsServiceParameter.payload.writeUInt8(0x00);
+    //confirmedNotificationsServiceParameter.setPayload(new byte[] { (byte) 0x00 }); // send unconfirmed notifications
+
+    let subscriptionLifetimeServiceParameter = new ServiceParameter();
+    subscriptionLifetimeServiceParameter.tagClass =
+      TagClass.CONTEXT_SPECIFIC_TAG;
+    subscriptionLifetimeServiceParameter.tagNumber = 0x03;
+    subscriptionLifetimeServiceParameter.lengthValueType = 0x01;
+    // 0x78 = 120d = 120 seconds = 2 minutes
+    subscriptionLifetimeServiceParameter.payload = Buffer.alloc(1);
+    subscriptionLifetimeServiceParameter.payload.writeUInt8(
+      subscriptionLifetimeInSeconds
+    );
+    //subscriptionLifetimeServiceParameter.setPayload(new byte[] { (byte) subscriptionLifetimeInSeconds });
+
+    var outApdu = new APDU();
+    outApdu.pduType = PDUType.CONFIRMED_SERVICE_REQUEST_PDU;
+    outApdu.invokeId = invokeId;
+    outApdu.confirmedServiceChoice = ConfirmedServiceChoice.SUBSCRIBE_COV;
+    outApdu.serviceParameters.push(subscriberProcessIdServiceParameter);
+    outApdu.serviceParameters.push(objectIdentifierServiceParameter);
+    outApdu.serviceParameters.push(confirmedNotificationsServiceParameter);
+    outApdu.serviceParameters.push(subscriptionLifetimeServiceParameter);
+
+    var outMessage = new Message();
+    outMessage.virtualLinkControl = virtualLinkControl;
+    outMessage.npdu = outNpdu;
+    outMessage.apdu = outApdu;
+
+    virtualLinkControl.length = outMessage.dataLength;
+
+    return outMessage;
+  }
+
+  activeCOVSubscriptions(deviceObject, invokeId) {
+    //
+    // Virtual Link Control
+    //
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.type = 0x81;
+    virtualLinkControl.function = 0x0a;
+    // is set later, when the full package data was added
+    virtualLinkControl.length = 0x00;
+
+    //
+    // NPDU including destination network information
+    //
+
+    var outNpdu = new NPDU();
+    outNpdu.version = 0x01;
+    // no additional information
+    // this works, if the cp is connected to the device directly via 192.168.2.1
+    //outNpdu.control = 0x00;
+    // destination specifier
+    outNpdu.control = 0x24;
+    outNpdu.destinationNetworkAddress = 999;
+    outNpdu.destinationMacLayerAddressLength = 1;
+    outNpdu.destinationAddress = 25;
+    outNpdu.destinationHopCount = 255;
+
+    //
+    // APDU
+    //
+
+    // this object identifier has to be context specific. I do not know why
+    let objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    objectIdentifierServiceParameter.tagNumber = 0x00;
+    objectIdentifierServiceParameter.lengthValueType =
+      ServiceParameterConstants.ServiceParameterConstants.OBJECT_IDENTIFIER_CODE;
+    objectIdentifierServiceParameter.objectType = deviceObject.objectType;
+    objectIdentifierServiceParameter.bacnetIdentifier =
+      deviceObject.bacnetIdentifier;
+
+    var propertyIdentifierServiceParameter = new ServiceParameter();
+    propertyIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    propertyIdentifierServiceParameter.tagNumber = 0x01;
+    propertyIdentifierServiceParameter.lengthValueType = 0x01;
+    propertyIdentifierServiceParameter.payload = Buffer.alloc(1);
+    propertyIdentifierServiceParameter.payload.writeUInt8(
+      DevicePropertyType.DevicePropertyType.ACTIVE_COV_SUBSCRIPTIONS,
+      0
+    );
+
+    var outApdu = new APDU();
+    outApdu.pduType = PDUType.CONFIRMED_SERVICE_REQUEST_PDU;
+    outApdu.invokeId = invokeId;
+    outApdu.confirmedServiceChoice = ConfirmedServiceChoice.READ_PROPERTY;
+
+    outApdu.serviceParameters.push(objectIdentifierServiceParameter);
+    outApdu.serviceParameters.push(propertyIdentifierServiceParameter);
+
+    var outMessage = new Message();
+    outMessage.virtualLinkControl = virtualLinkControl;
+    outMessage.npdu = outNpdu;
+    outMessage.apdu = outApdu;
+
+    virtualLinkControl.length = outMessage.dataLength;
+
+    return outMessage;
+  }
 }
 
 module.exports = MessageFactory;

@@ -158,19 +158,21 @@ class ServiceParameter {
 
         // 0x01
         case ServiceParameterConstants.APPLICATION_TAG_BOOLEAN:
-          var payload = message[offset + 1] & 0xff;
+          //var payload = message[offset + 1] & 0xff;
           //   console.log(
           //     ">>>>> BOOLEAN. The boolean value is = " +
           //       (this.lengthValueType == 1 ? "TRUE" : "FALSE")
           //   );
+          this.payload = message.slice(offset + 1, offset + 1 + 1);
           break;
 
         // 0x02
         case ServiceParameterConstants.UNSIGNED_INTEGER_CODE:
-          var payload = message[offset + 1] & 0xff;
+          //var payload = message[offset + 1] & 0xff;
           //   console.log(
           //     ">>>>> UNSIGNED INTEGER. The unsigned integer value is = " + payload
           //   );
+          this.payload = message.slice(offset + 1, offset + 1 + 1);
           break;
 
         // 0x07
@@ -209,23 +211,25 @@ class ServiceParameter {
         // 0x0a
         case ServiceParameterConstants.DATE:
           //   console.log(">>>>> DATE");
+          // TODO: parse payload
           break;
 
         // 0x0b
         case ServiceParameterConstants.TIME:
           //   console.log(">>>>> TIME");
+          // TODO: parse payload
           break;
 
         // 0x0c = 12d
         case ServiceParameterConstants.APPLICATION_TAG_BACNET_OBJECT_IDENTIFIER:
-          var data =
-            ((message[offset + 1] & 0xff) << 24) |
-            ((message[offset + 2] & 0xff) << 16) |
-            ((message[offset + 3] & 0xff) << 8) |
-            ((message[offset + 4] & 0xff) << 0);
+          //   var data =
+          //     ((message[offset + 1] & 0xff) << 24) |
+          //     ((message[offset + 2] & 0xff) << 16) |
+          //     ((message[offset + 3] & 0xff) << 8) |
+          //     ((message[offset + 4] & 0xff) << 0);
 
-          var objectType = (data & (1023 << 22)) >> 22;
-          var bacnetIdentifier = (data & (4194303 << 0)) >> 0;
+          //   var objectType = (data & (1023 << 22)) >> 22;
+          //   var bacnetIdentifier = (data & (4194303 << 0)) >> 0;
 
           //   console.log(
           //     ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
@@ -246,6 +250,7 @@ class ServiceParameter {
 
         case ServiceParameterConstants.APPLICATION_TAG_NUMBER_BIT_STRING:
           //   console.log(">>>>> BIT_STRING");
+          // TODO: parse payload
           break;
 
         default:

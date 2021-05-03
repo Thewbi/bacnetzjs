@@ -8,11 +8,13 @@ const UnconfirmedServiceChoice = require("./protocol/unconfirmedservicechoice.js
 const PDUType = require("./protocol/pdutype.js");
 
 const Message = require("./transport/message.js");
+const ObjectType = require("./protocol/objecttype.js");
 
 const DeviceObject = require("./model/deviceobject.js");
 const MessageToDeviceObjectConverter = require("./conversion/MessageToDeviceObjectConverter.js");
 
 const util = require("./common/util.js");
+const TagClass = require("./protocol/tagclass.js");
 
 // wireshark display filter: bacnet || bvlc || bacapp
 
@@ -303,7 +305,7 @@ function requestAllProperties(objectType, bacnetIdentifier) {
 //requestAllProperties(8, 25); // only works with destination specifier in NPDU!
 //requestAllProperties(19, 1); // object type: multistate value (19)
 //requestAllProperties(19, 2); // object type: multistate value (19)
-//requestAllProperties(19, 3); // object type: multistate value (19)
+//requestAllProperties(19, 3); // object type: multistate value (19), 'TZ320_state'
 //requestAllProperties(19, 4); // object type: multistate value (19)
 //requestAllProperties(8, 10000); // only works with destination specifier in NPDU!
 //requestAllProperties(17, 0);
@@ -403,12 +405,10 @@ function writeProperty(objectType, bacnetIdentifier, value) {
 //writeProperty(19, 4, 0x03); // 19 = multi-state-value, 4 = bacnet instance number
 
 // 0x04 -  Kurzzeitfreigabe TZ320 (For the KZF to actually activate, the lock has to be in locked state)
-writeProperty(19, 4, 0x04); // 19 = multi-state-value, 4 = bacnet instance number
-//writeProperty(19, 4, 0x02);
-//writeProperty(19, 4, 0x03);
+//writeProperty(19, 4, 0x04); // 19 = multi-state-value, 4 = bacnet instance number
 
 // stackoverflow.com/questions/6177423/send-broadcast-datagram
-https: function broadcastNew() {
+https: function broadcastWhoIs() {
   //var message = Buffer.from("Broadcast message!");
   var message = Buffer.from("810b000801001008", "hex");
   //var message = new Buffer([0x81, 0x0b, 0x00, 0x08, 0x01, 0x00, 0x10, 0x08]);
@@ -439,6 +439,300 @@ https: function broadcastNew() {
     }
   );
 }
+
+/** Sends COVSubscription over a socket that is later reused to receive the COV messages and also to renew the subscriptions */
+function covSubscription(
+  socket,
+  objectType,
+  bacnetIdentifier,
+  invokeId,
+  subscriptionLifetimeInSeconds
+) {
+  let deviceObject = new DeviceObject();
+  deviceObject.objectType = objectType;
+  deviceObject.bacnetIdentifier = bacnetIdentifier;
+
+  let messageFactory = new MessageFactory();
+  let message = messageFactory.subscribeCOV(
+    deviceObject,
+    invokeId,
+    subscriptionLifetimeInSeconds
+  );
+
+  let offset = 0;
+
+  let payload = message.bytes;
+
+  // send a request and keep the socket open so the response can be retrieved
+  socket.send(
+    payload,
+    offset,
+    payload.length,
+    DESTINATION_PORT,
+    DESTINATION_ADDRESS,
+    function () {
+      console.log(
+        "Sent '" +
+          util.byteArrayToHexString(payload) +
+          "' Length = " +
+          payload.length
+      );
+    }
+  );
+}
+
+function subscribeCOV(objectType, bacnetIdentifier) {
+  var socket = dgram.createSocket("udp4");
+
+  // add handlers first, before sending a request
+  socket.on("listening", function () {
+    var address = socket.address();
+    console.log(
+      "UDP Server listening on " + address.address + ":" + address.port
+    );
+  });
+
+  // add handlers first, before sending a request
+  socket.on("message", function (message, remoteInfo) {
+    // DEBUG - output the raw data
+    // console.log(
+    //   "Response from " +
+    //     remoteInfo.address +
+    //     ":" +
+    //     remoteInfo.port +
+    //     " - " +
+    //     util.byteArrayToHexString(message)
+    // );
+
+    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+
+    var offset = 0;
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.fromBytes(message, offset);
+    offset += virtualLinkControl.dataSizeInBuffer;
+
+    var npdu = new NPDU();
+    npdu.fromBytes(message, offset);
+    offset += npdu.dataSizeInBuffer;
+
+    var apdu = new APDU();
+    apdu.fromBytes(message, offset);
+    offset += apdu.dataSizeInBuffer;
+
+    // incoming BACNet message
+    var bacnetMessage = new Message();
+    bacnetMessage.remoteInfo = remoteInfo;
+    bacnetMessage.virtualLinkControl = virtualLinkControl;
+    bacnetMessage.npdu = npdu;
+    bacnetMessage.apdu = apdu;
+
+    //console.log("Incoming Message as String: " + bacnetMessage.asString);
+
+    bacnetMessage.parseServiceParameters();
+
+    //console.log(bacnetMessage.asString);
+
+    if (
+      bacnetMessage.apdu.unconfirmedServiceChoice ==
+      UnconfirmedServiceChoice.UnconfirmedServiceChoice
+        .UNCONFIRMED_COV_NOTIFICATION
+    ) {
+      console.log("COV-Notification received!");
+
+      // object identifier of parent object
+      let parentObjectServiceParameter =
+        bacnetMessage.apdu.serviceParameters[1];
+
+      let data =
+        ((parentObjectServiceParameter.payload[0] & 0xff) << 24) |
+        ((parentObjectServiceParameter.payload[1] & 0xff) << 16) |
+        ((parentObjectServiceParameter.payload[2] & 0xff) << 8) |
+        ((parentObjectServiceParameter.payload[3] & 0xff) << 0);
+
+      let objectType = (data & (1023 << 22)) >> 22;
+      let bacnetIdentifier = (data & (4194303 << 0)) >> 0;
+
+      console.log(
+        ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
+          ObjectType.getLabel(objectType) +
+          " (" +
+          objectType +
+          ") " +
+          " bacnetIdentifier = " +
+          bacnetIdentifier
+      );
+
+      // object identifier of child object
+      let childObjectServiceParameter = bacnetMessage.apdu.serviceParameters[2];
+
+      data =
+        ((childObjectServiceParameter.payload[0] & 0xff) << 24) |
+        ((childObjectServiceParameter.payload[1] & 0xff) << 16) |
+        ((childObjectServiceParameter.payload[2] & 0xff) << 8) |
+        ((childObjectServiceParameter.payload[3] & 0xff) << 0);
+
+      objectType = (data & (1023 << 22)) >> 22;
+      bacnetIdentifier = (data & (4194303 << 0)) >> 0;
+
+      console.log(
+        ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
+          ObjectType.getLabel(objectType) +
+          " (" +
+          objectType +
+          ") " +
+          " bacnetIdentifier = " +
+          bacnetIdentifier
+      );
+
+      for (let i = 0; i < bacnetMessage.apdu.serviceParameters.length; i++) {
+        let serviceParameter = bacnetMessage.apdu.serviceParameters[i];
+
+        // look for the present value
+        if (serviceParameter.tagClass == TagClass.APPLICATION_TAG) {
+          if (serviceParameter.tagNumber == 2) {
+            console.log("Present-Value: " + serviceParameter.payload[0]);
+
+            // 1 = unlock
+            // 2 = time switch active
+            // 3 = pre-lock
+            // 4 = lock
+            // 5 = burglar-lock
+            // 6 = short time released
+            // 7 = service mode
+            // 8 = alarm active
+            // 9 = active sluice
+            // 10 = passive sluice
+            // 11 = sluice busy
+          }
+        }
+      }
+    }
+  });
+
+  let invokeId = 0;
+  let subscriptionLifetimeInSeconds = 10;
+
+  console.log(
+    "COV subscribing for " + subscriptionLifetimeInSeconds + " seconds"
+  );
+
+  // initial subscribe to object-type: multistate value (19) - bacnet identifier: 3 - name: 'TZ320_state'
+  invokeId++;
+  covSubscription(
+    socket,
+    objectType,
+    bacnetIdentifier,
+    invokeId,
+    subscriptionLifetimeInSeconds
+  );
+
+  setInterval(function () {
+    console.log(
+      "COV subscribing for " + subscriptionLifetimeInSeconds + " seconds"
+    );
+
+    // subscribe to object-type: multistate value (19) - bacnet identifier: 3 - name: 'TZ320_state'
+    invokeId++;
+    covSubscription(
+      socket,
+      objectType,
+      bacnetIdentifier,
+      invokeId,
+      subscriptionLifetimeInSeconds
+    );
+  }, (subscriptionLifetimeInSeconds - 3) * 1000);
+}
+
+subscribeCOV(19, 3);
+
+function activeCOVSubscriptions(objectType, bacnetIdentifier, invokeId) {
+  var socket = dgram.createSocket("udp4");
+
+  // add handlers first, before sending a request
+  socket.on("listening", function () {
+    var address = socket.address();
+    console.log(
+      "UDP Server listening on " + address.address + ":" + address.port
+    );
+  });
+
+  // add handlers first, before sending a request
+  socket.on("message", function (message, remoteInfo) {
+    // DEBUG - output the raw data
+    // console.log(
+    //   "Response from " +
+    //     remoteInfo.address +
+    //     ":" +
+    //     remoteInfo.port +
+    //     " - " +
+    //     util.byteArrayToHexString(message)
+    // );
+
+    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
+
+    var offset = 0;
+
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.fromBytes(message, offset);
+    offset += virtualLinkControl.dataSizeInBuffer;
+
+    var npdu = new NPDU();
+    npdu.fromBytes(message, offset);
+    offset += npdu.dataSizeInBuffer;
+
+    var apdu = new APDU();
+    apdu.fromBytes(message, offset);
+    offset += apdu.dataSizeInBuffer;
+
+    // incoming BACNet message
+    var bacnetMessage = new Message();
+    bacnetMessage.remoteInfo = remoteInfo;
+    bacnetMessage.virtualLinkControl = virtualLinkControl;
+    bacnetMessage.npdu = npdu;
+    bacnetMessage.apdu = apdu;
+
+    //console.log("Incoming Message as String: " + bacnetMessage.asString);
+
+    bacnetMessage.parseServiceParameters();
+
+    console.log(bacnetMessage.asString);
+  });
+
+  let deviceObject = new DeviceObject();
+  deviceObject.objectType = objectType;
+  deviceObject.bacnetIdentifier = bacnetIdentifier;
+
+  let messageFactory = new MessageFactory();
+  let message = messageFactory.activeCOVSubscriptions(deviceObject, invokeId);
+
+  let offset = 0;
+
+  let payload = message.bytes;
+
+  // send a request and keep the socket open so the response can be retrieved
+  socket.send(
+    payload,
+    offset,
+    payload.length,
+    DESTINATION_PORT,
+    DESTINATION_ADDRESS,
+    function () {
+      console.log(
+        "Sent '" +
+          util.byteArrayToHexString(payload) +
+          "' Length = " +
+          payload.length
+      );
+    }
+  );
+}
+
+//activeCOVSubscriptions(19, 1, 1);
+//activeCOVSubscriptions(19, 2, 1);
+//activeCOVSubscriptions(19, 3, 1);
+//activeCOVSubscriptions(19, 4, 1);
+//activeCOVSubscriptions(8, 10000, 1);
 
 client.on("listening", function () {
   var address = client.address();
@@ -527,8 +821,8 @@ client.on("message", function (message, remoteInfo) {
 // server.bind(function () {
 //   // server will listen to broadcast messages
 //   server.setBroadcast(true);
-//   // schedule a call to the broadcastNew function every x milliseconds
-//   setInterval(broadcastNew, 3000);
+//   // schedule a call to the broadcastWhoIs function every x milliseconds
+//   setInterval(broadcastWhoIs, 3000);
 // });
 
 // client.bind(BROADCAST_LISTENING_PORT);
