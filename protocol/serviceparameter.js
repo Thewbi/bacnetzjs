@@ -1,6 +1,6 @@
 const TagClass = require("./tagclass.js");
-const ServiceParameterConstants = require("./serviceparameterconstants.js")
-  .ServiceParameterConstants;
+const ServiceParameterConstants =
+  require("./serviceparameterconstants.js").ServiceParameterConstants;
 const ObjectType = require("./objecttype.js");
 const DevicePropertyType = require("./devicepropertytype.js");
 
@@ -74,20 +74,35 @@ class ServiceParameter {
     // Service parameters either are CONTEXT_SPECIFIC tags oder APPLICATION tags.
     // This if has two branches, one for CONTEXT_SPECIFIC tags and another APPLICATION tags.
     if (this.tagClass == TagClass.CONTEXT_SPECIFIC_TAG) {
+      console.log("length: " + this.lengthValueType);
       //
       // CONTEXT_SPECIFIC tags
       //
       switch (this.lengthValueType) {
         // 0x01
         case ServiceParameterConstants.PROPERTY_IDENTIFIER_CODE:
-          var payload = message[offset + 1] & 0xff;
+          this.payload = message[offset + 1] & 0xff;
+          console.log(
+            ">>>>> PROPERTY_IDENTIFIER_CODE of property " +
+              DevicePropertyType.getLabel(this.payload) +
+              " (" +
+              this.payload +
+              ")"
+          );
+
+          //   //the length of the contained payload is store in the first byte
+          //   var payloadLength = message[offset + 1] & 0xff;
           //   console.log(
-          //     ">>>>> PROPERTY_IDENTIFIER_CODE of property " +
-          //       DevicePropertyType.getLabel(payload) +
-          //       " (" +
-          //       payload +
-          //       ")"
+          //     ">>>>> EXTENDED_TAG_CODE the payload length to read is: " +
+          //       payloadLength
           //   );
+
+          //   // consume the bytes that this extended tag contains
+          //   let targetBuffer = Buffer.alloc(payloadLength);
+          //   message.copy(targetBuffer, 0, offset + 2, offset + 2 + payloadLength);
+          //   console.log(targetBuffer.toString());
+
+          //   this.payload = message.slice(offset + 2, offset + 2 + payloadLength);
           break;
 
         // 0x04
@@ -137,9 +152,10 @@ class ServiceParameter {
           break;
 
         default:
-          //   console.log(
-          //     "Unknown CONTEXT_TAG! lengthValueType = " + this.lengthValueType
-          //   );
+          console.log(
+            "Unknown CONTEXT_TAG! lengthValueType = " + this.lengthValueType
+          );
+
           break;
       }
     } else if (this.tagClass == TagClass.APPLICATION_TAG) {
@@ -168,11 +184,22 @@ class ServiceParameter {
 
         // 0x02
         case ServiceParameterConstants.UNSIGNED_INTEGER_CODE:
-          //var payload = message[offset + 1] & 0xff;
-          //   console.log(
-          //     ">>>>> UNSIGNED INTEGER. The unsigned integer value is = " + payload
-          //   );
-          this.payload = message.slice(offset + 1, offset + 1 + 1);
+          //this.payload = message[offset + 1] & 0xff;
+
+          this.payload = message.slice(
+            offset + 1,
+            offset + 1 + this.lengthValueType
+          );
+
+          console.log(
+            ">>>>> UNSIGNED INTEGER. offset: " +
+              offset +
+              " length: " +
+              this.lengthValueType +
+              " The unsigned integer value is = " +
+              this.payload.toString("hex") +
+              " !"
+          );
           break;
 
         // 0x07
@@ -291,47 +318,62 @@ class ServiceParameter {
 
         switch (this.tagNumber) {
           case ServiceParameterConstants.BIT_STRING_CODE:
-            data += "BIT STRING";
+            data += " BIT STRING";
             break;
 
           case ServiceParameterConstants.APPLICATION_TAG_BOOLEAN:
-            data += "BOOLEAN";
+            data += " BOOLEAN";
             break;
 
           case ServiceParameterConstants.APPLICATION_TAG_REAL:
-            data += "REAL";
+            data += " REAL";
             // final byte[] data = { 0x3f, 0x35, (byte) 0xc2, (byte) 0x8f };
             //                final float realValue = ByteBuffer.wrap(payload).order(ByteOrder.BIG_ENDIAN).getFloat();
             //                stringBuffer.append(" Value: ").append(realValue);
             break;
 
           case ServiceParameterConstants.APPLICATION_TAG_DATE:
-            data += "DATE";
+            data += " DATE";
             break;
 
           case ServiceParameterConstants.APPLICATION_TAG_TIME:
-            data += "TIME";
+            data += " TIME";
             break;
 
           case ServiceParameterConstants.APPLICATION_TAG_NUMBER_CHARACTER_STRING:
             // final String temp = new String(payload);
             // stringBuffer.append("Character String (7) '").append(temp).append("'");
+            data += " APPLICATION_TAG_NUMBER_CHARACTER_STRING";
             break;
 
           case ServiceParameterConstants.UNSIGNED_INTEGER_CODE:
             //data += ("Unsigned Integer (2) - VALUE: ").append("" + (payload[0] & 0xFF));
+
+            let value = (this.payload[0] & 0xff) << 8;
+            value += (this.payload[1] & 0xff) << 0;
+
+            data +=
+              " UNSIGNED_INTEGER_CODE " +
+              this.payload.toString("hex") +
+              " " +
+              value;
             break;
 
           case ServiceParameterConstants.ENUMERATED_CODE:
             //stringBuffer.append("Enumerated (9)");
+            data += " ENUMERATED_CODE";
             break;
 
-          // 0x12
+          // BACnetObjectIdentifier 0x12
           case ServiceParameterConstants.BACNET_OBJECT_IDENTIFIER:
-            //stringBuffer.append("BACnetObjectIdentifier (12)");
             // the first ten bit contain the type of object this object identifier describes
             let objectType = (this.payload[0] & 0xff) << 2;
             objectType += (this.payload[1] & 0xc0) >> 6;
+
+            // remaining bits describe the device instance number
+            let instanceId = (this.payload[1] & 0x3f) << 16;
+            instanceId += this.payload[2] << 8;
+            instanceId += this.payload[3] << 0;
 
             switch (objectType) {
               case ObjectType.ObjectType.ANALOG_INPUT:
@@ -387,13 +429,10 @@ class ServiceParameter {
                 break;
 
               default:
-                //throw new RuntimeException("Unknown ObjectType: " + objectType);
-                //                    LOG.error("Unknown ObjectType: " + objectType);
                 console.log("Unknown ObjectType: " + objectType);
             }
 
-            //let instanceNumber = getInstanceNumber();
-            //stringBuffer.append(", InstanceNumber: " + instanceNumber);
+            data += ", " + instanceId;
             break;
 
           default:
@@ -411,13 +450,18 @@ class ServiceParameter {
 
         switch (this.lengthValueType) {
           case 1:
-            // let codeAsUnsignedInt = payload[0] & 0xff;
+            let codeAsUnsignedInt = this.payload;
             // stringBuffer
             //   .append("[DeviceProperty:")
             //   .append(DevicePropertyType.getByCode(codeAsUnsignedInt).getName())
             //   .append(", Code: ")
             //   .append(codeAsUnsignedInt)
             //   .append("]");
+            data +=
+              " [Property: " +
+              DevicePropertyType.getLabel(codeAsUnsignedInt) +
+              ", " +
+              codeAsUnsignedInt;
             break;
 
           case ServiceParameterConstants.OPENING_TAG_CODE:
@@ -477,19 +521,27 @@ class ServiceParameter {
     let tagClassAsString =
       this.tagClass == 0 ? " Application Tag" : " Context Tag";
 
-    return (
+    let result =
       "TagClass = " +
       this.tagClass +
       tagClassAsString +
       ", tagNumber = " +
       this.tagNumber +
       ", lengthValueType = " +
-      this.lengthValueType +
-      ", payload = " +
-      this.payload +
-      ", data = " +
-      data
-    );
+      this.lengthValueType;
+
+    result += " " + JSON.stringify(this.payload);
+    // result += " type: " + typeof this.payload;
+    // if (typeof this.payload === Buffer) {
+    //   result += " buffer";
+    //   result += " , payload = " + this.payload.toString("hex");
+    // } else {
+    //   result += " not buffer";
+    //   result += " , payload = " + this.payload;
+    // }
+    result += " , data = " + data;
+
+    return result;
   }
 }
 

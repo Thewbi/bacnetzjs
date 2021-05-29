@@ -75,7 +75,7 @@ class Message {
     }
 
     //var arrByte = Uint8Array.from(data);
-    console.log(util.byteArrayToHexString(data));
+    console.log("getBytes() " + util.byteArrayToHexString(data));
 
     return data;
   }

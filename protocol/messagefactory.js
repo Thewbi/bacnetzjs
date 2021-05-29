@@ -2,10 +2,10 @@ const VirtualLinkControl = require("./virtualinkcontrol.js");
 const NPDU = require("./npdu.js");
 const APDU = require("./apdu.js");
 const PDUType = require("./pdutype.js").PDUType;
-const UnconfirmedServiceChoice = require("./unconfirmedservicechoice.js")
-  .UnconfirmedServiceChoice;
-const ConfirmedServiceChoice = require("./confirmedservicechoice.js")
-  .ConfirmedServiceChoice;
+const UnconfirmedServiceChoice =
+  require("./unconfirmedservicechoice.js").UnconfirmedServiceChoice;
+const ConfirmedServiceChoice =
+  require("./confirmedservicechoice.js").ConfirmedServiceChoice;
 const ServiceParameter = require("./serviceparameter.js").ServiceParameter;
 const ServiceParameterConstants = require("./serviceparameterconstants.js");
 const ObjectIdentifierServiceParameter = require("./objectidentifierserviceparameter.js");
@@ -29,6 +29,7 @@ class MessageFactory {
     npdu.control = 0x00;
 
     var apdu = new APDU();
+    apdu.segmentedResponseAccepted = false;
     apdu.pduType = PDUType.UNCONFIRMED_SERVICE_REQUEST_PDU;
     apdu.unconfirmedServiceChoice = UnconfirmedServiceChoice.WHO_IS;
 
@@ -57,7 +58,8 @@ class MessageFactory {
     outNpdu.control = 0x00;
 
     // this object identifier has to be context specific. I do not know why
-    var objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    var objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
     objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
     objectIdentifierServiceParameter.tagNumber = 0x00;
     objectIdentifierServiceParameter.lengthValueType =
@@ -117,7 +119,8 @@ class MessageFactory {
     outNpdu.control = 0x00;
 
     // this object identifier has to be context specific. I do not know why
-    var objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    var objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
     objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
     objectIdentifierServiceParameter.tagNumber = 0x00;
     objectIdentifierServiceParameter.lengthValueType =
@@ -176,7 +179,8 @@ class MessageFactory {
     outNpdu.destinationHopCount = 255;
 
     // this object identifier has to be context specific. I do not know why
-    var objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    var objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
     objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
     objectIdentifierServiceParameter.tagNumber = 0x00;
     objectIdentifierServiceParameter.lengthValueType =
@@ -232,6 +236,85 @@ class MessageFactory {
     return outMessage;
   }
 
+  property(deviceObject, deviceProperty) {
+    var virtualLinkControl = new VirtualLinkControl();
+    virtualLinkControl.type = 0x81;
+    virtualLinkControl.function = 0x0a;
+    // is set later, when the full package data was added
+    virtualLinkControl.length = 0x00;
+
+    // NPDU including destination network information
+    var outNpdu = new NPDU();
+    outNpdu.version = 0x01;
+    // no additional information
+    // this works, if the cp is connected to the device directly via 192.168.2.1
+    //outNpdu.control = 0x00;
+
+    // destination specifier
+    outNpdu.control = 0x24;
+    outNpdu.destinationNetworkAddress = 999;
+    outNpdu.destinationMacLayerAddressLength = 1;
+    outNpdu.destinationAddress = 25;
+    outNpdu.destinationHopCount = 255;
+
+    // this object identifier has to be context specific. I do not know why
+    var objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
+    objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    objectIdentifierServiceParameter.tagNumber = 0x00;
+    objectIdentifierServiceParameter.lengthValueType =
+      ServiceParameterConstants.ServiceParameterConstants.OBJECT_IDENTIFIER_CODE;
+    objectIdentifierServiceParameter.objectType = deviceObject.objectType;
+    objectIdentifierServiceParameter.bacnetIdentifier =
+      deviceObject.bacnetIdentifier;
+
+    // {[1] opening bracket
+    var openingBracketServiceParameter = new ServiceParameter();
+    openingBracketServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    openingBracketServiceParameter.tagNumber = 0x01;
+    openingBracketServiceParameter.lengthValueType =
+      ServiceParameterConstants.ServiceParameterConstants.OPENING_TAG_CODE;
+
+    // request ALL
+    var allDevicePropertyServiceParameter = new ServiceParameter();
+    allDevicePropertyServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    allDevicePropertyServiceParameter.tagNumber = 0x00;
+    allDevicePropertyServiceParameter.lengthValueType = 1;
+    //allDevicePropertyServiceParameter.setPayload(new byte[] { (byte) DevicePropertyType.ALL.getCode() });
+    allDevicePropertyServiceParameter.payload = Buffer.alloc(1);
+    let offset = 0;
+    allDevicePropertyServiceParameter.payload.writeUInt8(
+      deviceProperty,
+      offset
+    );
+
+    // }[1] closeing bracket
+    var closingBracketServiceParameter = new ServiceParameter();
+    closingBracketServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
+    closingBracketServiceParameter.tagNumber = 0x01;
+    closingBracketServiceParameter.lengthValueType =
+      ServiceParameterConstants.ServiceParameterConstants.CLOSING_TAG_CODE;
+
+    var outApdu = new APDU();
+    outApdu.pduType = PDUType.CONFIRMED_SERVICE_REQUEST_PDU;
+    outApdu.invokeId = 1;
+    outApdu.confirmedServiceChoice =
+      ConfirmedServiceChoice.READ_PROPERTY_MULTIPLE;
+    outApdu.serviceParameters.push(objectIdentifierServiceParameter);
+    outApdu.serviceParameters.push(openingBracketServiceParameter);
+    outApdu.serviceParameters.push(allDevicePropertyServiceParameter);
+    outApdu.serviceParameters.push(closingBracketServiceParameter);
+
+    var outMessage = new Message();
+    outMessage.virtualLinkControl = virtualLinkControl;
+    outMessage.npdu = outNpdu;
+    outMessage.apdu = outApdu;
+
+    virtualLinkControl.length = outMessage.dataLength;
+
+    return outMessage;
+  }
+
   writeProperty(deviceObject, value) {
     var virtualLinkControl = new VirtualLinkControl();
     virtualLinkControl.type = 0x81;
@@ -255,7 +338,8 @@ class MessageFactory {
     outNpdu.destinationHopCount = 255;
 
     // this object identifier has to be context specific. I do not know why
-    var objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    var objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
     objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
     objectIdentifierServiceParameter.tagNumber = 0x00;
     objectIdentifierServiceParameter.lengthValueType =
@@ -368,7 +452,8 @@ class MessageFactory {
     //subscriberProcessIdServiceParameter.setPayload(new byte[] { (byte) 0x01 });
 
     // this object identifier has to be context specific. I do not know why
-    let objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    let objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
     objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
     objectIdentifierServiceParameter.tagNumber = 0x01;
     objectIdentifierServiceParameter.lengthValueType =
@@ -451,7 +536,8 @@ class MessageFactory {
     //
 
     // this object identifier has to be context specific. I do not know why
-    let objectIdentifierServiceParameter = new ObjectIdentifierServiceParameter();
+    let objectIdentifierServiceParameter =
+      new ObjectIdentifierServiceParameter();
     objectIdentifierServiceParameter.tagClass = TagClass.CONTEXT_SPECIFIC_TAG;
     objectIdentifierServiceParameter.tagNumber = 0x00;
     objectIdentifierServiceParameter.lengthValueType =
