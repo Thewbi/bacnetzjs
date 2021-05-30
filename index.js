@@ -17,6 +17,7 @@ const DevicePropertyType = require("./protocol/devicepropertytype.js");
 
 const util = require("./common/util.js");
 const TagClass = require("./protocol/tagclass.js");
+const { ConsoleReporter } = require("jasmine");
 
 // wireshark display filter: bacnet || bvlc || bacapp
 
@@ -35,12 +36,22 @@ const TagClass = require("./protocol/tagclass.js");
 // local lan
 //var SOURCE_PORT = 12345;
 var SOURCE_PORT = 47808;
-var SOURCE_ADDRESS = "192.168.0.2";
-//var DESTINATION_PORT = 1060;
-var DESTINATION_PORT = 1026;
-//var DESTINATION_PORT = 47808;
-var DESTINATION_ADDRESS = "192.168.0.1";
+//var SOURCE_ADDRESS = "127.0.0.1";
+//var SOURCE_ADDRESS = "192.168.0.2";
+var SOURCE_ADDRESS = "192.168.0.234";
+
+//var DESTINATION_ADDRESS = "127.0.0.1";
+//var DESTINATION_ADDRESS = "192.168.0.1";
+var DESTINATION_ADDRESS = "192.168.0.108";
+//var DESTINATION_ADDRESS = "192.168.0.234";
+
+//var DESTINATION_PORT = 10002;
+//var DESTINATION_PORT = 10036;
+//var DESTINATION_PORT = 1026;
+var DESTINATION_PORT = 47808;
+
 var BROADCAST_LISTENING_PORT = 47808;
+//var BROADCAST_ADDR = "192.168.0.255";
 var BROADCAST_ADDR = "192.168.0.255";
 
 // for WAGO 750-831
@@ -55,7 +66,14 @@ var client = dgram.createSocket("udp4");
 
 // Request: 810a001301000005010c0c02002710194c2900
 // objectType 8 is device
-function requestObjectListSize(objectType, bacnetIdentifier) {
+function requestObjectListSize(
+  objectType,
+  bacnetIdentifier,
+  sourceAddress,
+  sourcePort,
+  targetAddress,
+  targetPort
+) {
   let deviceObject = new DeviceObject();
   deviceObject.objectType = objectType;
   deviceObject.bacnetIdentifier = bacnetIdentifier;
@@ -114,15 +132,20 @@ function requestObjectListSize(objectType, bacnetIdentifier) {
     console.log("Incoming Message as String: " + bacnetMessage.asString);
 
     bacnetMessage.parseServiceParameters();
+
+    socket.close();
+    socket = null;
   });
+
+  socket.bind(sourcePort, sourceAddress);
 
   // send a request and keep the socket open so the response can be retrieved
   socket.send(
     payload,
     offset,
     payload.length,
-    DESTINATION_PORT,
-    DESTINATION_ADDRESS,
+    targetPort,
+    targetAddress,
     function () {
       console.log(
         "requestObjectListSize() Sent '" +
@@ -132,14 +155,29 @@ function requestObjectListSize(objectType, bacnetIdentifier) {
       );
     }
   );
-}
 
-//requestObjectListSize(8, 36);
+  setTimeout(() => {
+    if (socket !== null) {
+      socket.close();
+    }
+  }, 3000);
+}
+exports.requestObjectListSize = requestObjectListSize;
+
+// requestObjectListSize(
+//   8,
+//   36,
+//   SOURCE_ADDRESS,
+//   SOURCE_PORT,
+//   DESTINATION_ADDRESS,
+//   DESTINATION_PORT
+// );
 //requestObjectListSize(8, 10000);
 //requestObjectListSize(8, 1000);
 
 // deviceType 8 is device
 function requestObjectList(objectType, bacnetIdentifier) {
+  console.log("requestObjectList()");
   let deviceObject = new DeviceObject();
   deviceObject.objectType = objectType;
   deviceObject.bacnetIdentifier = bacnetIdentifier;
@@ -202,36 +240,42 @@ function requestObjectList(objectType, bacnetIdentifier) {
     console.log(bacnetMessage.asString);
   });
 
-  var port = SOURCE_PORT;
-  //var port = 47808;
-  var host = SOURCE_ADDRESS;
-  socket.bind(port, host);
+  console.log("bind() ...");
+  socket.bind(SOURCE_PORT, SOURCE_ADDRESS, () => {
+    console.log("bind() done.");
+  });
 
-  console.log(
-    "requestObjectList() Sending to IP: " +
-      DESTINATION_ADDRESS +
-      " Port: " +
-      DESTINATION_PORT
-  );
+  console.log("waiting ...");
+  setTimeout(() => {
+    console.log("waiting done.");
+    console.log(
+      "requestObjectList() Sending to IP: " +
+        DESTINATION_ADDRESS +
+        " Port: " +
+        DESTINATION_PORT
+    );
 
-  // send a request and keep the socket open so the response can be retrieved
-  socket.send(
-    payload,
-    offset,
-    payload.length,
-    DESTINATION_PORT,
-    DESTINATION_ADDRESS,
-    function () {
-      console.log(
-        "Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
-      );
-    }
-  );
+    // send a request and keep the socket open so the response can be retrieved
+    socket.send(
+      payload,
+      offset,
+      payload.length,
+      DESTINATION_PORT,
+      DESTINATION_ADDRESS,
+      function (error, bytes) {
+        console.log(
+          "Sent '" +
+            util.byteArrayToHexString(payload) +
+            "' Length = " +
+            payload.length
+        );
+        console.log("error: '" + error + "' bytes = " + bytes);
+      }
+    );
+  }, 3000);
 }
 
+requestObjectList(8, 2);
 //requestObjectList(8, 36);
 //requestObjectList(8, 10000);
 //requestObjectList(8, 1000);
@@ -436,7 +480,7 @@ function requestProperty(objectType, bacnetIdentifier, deviceProperty) {
   //   }, 3000);
 }
 
-requestProperty(8, 2, DevicePropertyType.DevicePropertyType.VENDOR_IDENTIFIER);
+//requestProperty(8, 2, DevicePropertyType.DevicePropertyType.VENDOR_IDENTIFIER);
 //requestProperty(8, 2, DevicePropertyType.DevicePropertyType.VENDOR_NAME);
 // requestProperty(
 //   8,
@@ -576,6 +620,8 @@ function broadcastWhoIs() {
     }
   );
 }
+
+//broadcastWhoIs();
 
 /** Sends COVSubscription over a socket that is later reused to receive the COV messages and also to renew the subscriptions */
 function covSubscription(

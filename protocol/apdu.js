@@ -1,11 +1,11 @@
 const ServiceParameter = require("./serviceparameter.js").ServiceParameter;
 const PDUType = require("./pdutype.js");
 const UnconfirmedServiceChoice =
-  require("./UnconfirmedServiceChoice.js").UnconfirmedServiceChoice;
+  require("./unconfirmedservicechoice.js").UnconfirmedServiceChoice;
 const unconfirmedServiceChoiceGetLabel =
-  require("./UnconfirmedServiceChoice.js").getLabel;
+  require("./unconfirmedservicechoice.js").getLabel;
 const confirmedServiceChoiceGetLabel =
-  require("./ConfirmedServiceChoice.js").getLabel;
+  require("./confirmedservicechoice.js").getLabel;
 const ErrorClass = require("./errorclass.js");
 const ErrorCode = require("./errorcode.js");
 const util = require("../common/util.js");
