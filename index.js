@@ -17,7 +17,7 @@ const DevicePropertyType = require("./protocol/devicepropertytype.js");
 
 const util = require("./common/util.js");
 const TagClass = require("./protocol/tagclass.js");
-const { ConsoleReporter } = require("jasmine");
+//const { ConsoleReporter } = require("jasmine");
 
 // wireshark display filter: bacnet || bvlc || bacapp
 
@@ -34,25 +34,32 @@ const { ConsoleReporter } = require("jasmine");
 //var BROADCAST_ADDR = "192.168.2.255";
 
 // local lan
-//var SOURCE_PORT = 12345;
-var SOURCE_PORT = 47808;
-//var SOURCE_ADDRESS = "127.0.0.1";
-//var SOURCE_ADDRESS = "192.168.0.2";
-var SOURCE_ADDRESS = "192.168.0.234";
+const SOURCE_PORT = 12345;
+//var SOURCE_PORT = 47808;
 
-//var DESTINATION_ADDRESS = "127.0.0.1";
-//var DESTINATION_ADDRESS = "192.168.0.1";
-var DESTINATION_ADDRESS = "192.168.0.108";
-//var DESTINATION_ADDRESS = "192.168.0.234";
+// for connecting from localhost to localhost you cannot bind to 127.0.0.1 but you must bind to 0.0.0.0 instead.
+// Otherwise the connection will work!
+// https://github.com/nodejs/node/issues/29047
+const SOURCE_ADDRESS = "0.0.0.0";
+//const SOURCE_ADDRESS = "127.0.0.1";
+//const SOURCE_ADDRESS = "192.168.0.2";
+//const SOURCE_ADDRESS = "192.168.0.234";
 
-//var DESTINATION_PORT = 10002;
-//var DESTINATION_PORT = 10036;
-//var DESTINATION_PORT = 1026;
-var DESTINATION_PORT = 47808;
+//const DESTINATION_PORT = 10002;
+//const DESTINATION_PORT = 10036;
+//const DESTINATION_PORT = 1026;
+const DESTINATION_PORT = 47808;
 
-var BROADCAST_LISTENING_PORT = 47808;
-//var BROADCAST_ADDR = "192.168.0.255";
-var BROADCAST_ADDR = "192.168.0.255";
+const DESTINATION_ADDRESS = "0.0.0.0";
+//const DESTINATION_ADDRESS = "127.0.0.1";
+//const DESTINATION_ADDRESS = "192.168.0.1";
+//const DESTINATION_ADDRESS = "192.168.0.108";
+//const DESTINATION_ADDRESS = "192.168.0.234";
+
+const BROADCAST_LISTENING_PORT = 47808;
+
+//const BROADCAST_ADDR = "192.168.0.255";
+const BROADCAST_ADDR = "192.168.0.255";
 
 // for WAGO 750-831
 //var BROADCAST_LISTENING_PORT = 47808;
@@ -176,7 +183,14 @@ exports.requestObjectListSize = requestObjectListSize;
 //requestObjectListSize(8, 1000);
 
 // deviceType 8 is device
-function requestObjectList(objectType, bacnetIdentifier) {
+function requestObjectList(
+  objectType,
+  bacnetIdentifier,
+  sourceAddress,
+  sourcePort,
+  targetAddress,
+  targetPort
+) {
   console.log("requestObjectList()");
   let deviceObject = new DeviceObject();
   deviceObject.objectType = objectType;
@@ -241,46 +255,63 @@ function requestObjectList(objectType, bacnetIdentifier) {
   });
 
   console.log("bind() ...");
-  socket.bind(SOURCE_PORT, SOURCE_ADDRESS, () => {
+  socket.bind(sourcePort, sourceAddress, () => {
     console.log("bind() done.");
   });
+
+  console.log(
+    "requestObjectList() Sending to IP: " +
+      targetAddress +
+      " Port: " +
+      targetPort
+  );
+
+  // send a request and keep the socket open so the response can be retrieved
+  socket.send(
+    payload,
+    offset,
+    payload.length,
+    targetPort,
+    targetAddress,
+    function (error, bytes) {
+      console.log(
+        "Sent '" +
+          util.byteArrayToHexString(payload) +
+          "' Length = " +
+          payload.length
+      );
+      console.log("error: '" + error + "' bytes = " + bytes);
+    }
+  );
 
   console.log("waiting ...");
   setTimeout(() => {
     console.log("waiting done.");
-    console.log(
-      "requestObjectList() Sending to IP: " +
-        DESTINATION_ADDRESS +
-        " Port: " +
-        DESTINATION_PORT
-    );
-
-    // send a request and keep the socket open so the response can be retrieved
-    socket.send(
-      payload,
-      offset,
-      payload.length,
-      DESTINATION_PORT,
-      DESTINATION_ADDRESS,
-      function (error, bytes) {
-        console.log(
-          "Sent '" +
-            util.byteArrayToHexString(payload) +
-            "' Length = " +
-            payload.length
-        );
-        console.log("error: '" + error + "' bytes = " + bytes);
-      }
-    );
-  }, 3000);
+    socket.close();
+  }, 1000);
 }
+exports.requestObjectList = requestObjectList;
 
-requestObjectList(8, 2);
+// requestObjectList(
+//   8,
+//   36,
+//   SOURCE_ADDRESS,
+//   SOURCE_PORT,
+//   DESTINATION_ADDRESS,
+//   DESTINATION_PORT
+// );
 //requestObjectList(8, 36);
 //requestObjectList(8, 10000);
 //requestObjectList(8, 1000);
 
-function requestAllProperties(objectType, bacnetIdentifier) {
+function requestAllProperties(
+  objectType,
+  bacnetIdentifier,
+  sourceAddress,
+  sourcePort,
+  targetAddress,
+  targetPort
+) {
   var socket = dgram.createSocket("udp4");
 
   // add handlers first, before sending a request
@@ -333,10 +364,10 @@ function requestAllProperties(objectType, bacnetIdentifier) {
     console.log("requestAllProperties() " + bacnetMessage.asString);
   });
 
-  var port = SOURCE_PORT;
+  //var port = SOURCE_PORT;
   //var port = 47808;
-  var host = SOURCE_ADDRESS;
-  socket.bind(port, host);
+  //var host = SOURCE_ADDRESS;
+  socket.bind(sourcePort, sourceAddress);
 
   let deviceObject = new DeviceObject();
   deviceObject.objectType = objectType;
@@ -354,8 +385,8 @@ function requestAllProperties(objectType, bacnetIdentifier) {
     payload,
     offset,
     payload.length,
-    DESTINATION_PORT,
-    DESTINATION_ADDRESS,
+    targetPort,
+    targetAddress,
     function () {
       console.log(
         "Sent '" +
@@ -365,7 +396,14 @@ function requestAllProperties(objectType, bacnetIdentifier) {
       );
     }
   );
+
+  console.log("waiting ...");
+  setTimeout(() => {
+    console.log("waiting done.");
+    socket.close();
+  }, 1000);
 }
+exports.requestAllProperties = requestAllProperties;
 
 // object-type: device (8) - bacnet identifier: 25
 // object-type: multistate value (19) - bacnet identifier: 1 - name: 'module_type' - Present Value can not be written! module_type is the value that the IO420 was configured as using the ST220 (Service Terminal 220)
@@ -377,6 +415,14 @@ function requestAllProperties(objectType, bacnetIdentifier) {
 // object-type: notification-class (15) - bacnet identifier: 40 - What does this do?
 
 //requestAllProperties(8, 2);
+// requestAllProperties(
+//   8,
+//   36,
+//   SOURCE_ADDRESS,
+//   SOURCE_PORT,
+//   DESTINATION_ADDRESS,
+//   DESTINATION_PORT
+// );
 //requestAllProperties(8, 25); // only works with destination specifier in NPDU!
 //requestAllProperties(19, 1); // object type: multistate value (19)
 //requestAllProperties(19, 2); // object type: multistate value (19)
@@ -385,7 +431,15 @@ function requestAllProperties(objectType, bacnetIdentifier) {
 //requestAllProperties(8, 10000); // only works with destination specifier in NPDU!
 //requestAllProperties(17, 0);
 
-function requestProperty(objectType, bacnetIdentifier, deviceProperty) {
+function requestProperty(
+  objectType,
+  bacnetIdentifier,
+  deviceProperty,
+  sourceAddress,
+  sourcePort,
+  targetAddress,
+  targetPort
+) {
   var socket = dgram.createSocket("udp4");
 
   // add handlers first, before sending a request
@@ -398,18 +452,6 @@ function requestProperty(objectType, bacnetIdentifier, deviceProperty) {
 
   // add handlers first, before sending a request
   socket.on("message", function (message, remoteInfo) {
-    // DEBUG - output the raw data
-    // console.log(
-    //   "Response from " +
-    //     remoteInfo.address +
-    //     ":" +
-    //     remoteInfo.port +
-    //     " - " +
-    //     util.byteArrayToHexString(message)
-    // );
-
-    // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
-
     var offset = 0;
 
     var virtualLinkControl = new VirtualLinkControl();
@@ -441,9 +483,7 @@ function requestProperty(objectType, bacnetIdentifier, deviceProperty) {
     socket = null;
   });
 
-  var port = SOURCE_PORT;
-  var host = SOURCE_ADDRESS;
-  socket.bind(port, host);
+  socket.bind(sourcePort, sourceAddress);
 
   let deviceObject = new DeviceObject();
   deviceObject.objectType = objectType;
@@ -461,8 +501,8 @@ function requestProperty(objectType, bacnetIdentifier, deviceProperty) {
     payload,
     offset,
     payload.length,
-    DESTINATION_PORT,
-    DESTINATION_ADDRESS,
+    targetPort,
+    targetAddress,
     function () {
       console.log(
         "Sent '" +
@@ -479,8 +519,17 @@ function requestProperty(objectType, bacnetIdentifier, deviceProperty) {
   //     }
   //   }, 3000);
 }
+exports.requestProperty = requestProperty;
 
-//requestProperty(8, 2, DevicePropertyType.DevicePropertyType.VENDOR_IDENTIFIER);
+// requestProperty(
+//   8,
+//   2,
+//   DevicePropertyType.DevicePropertyType.VENDOR_IDENTIFIER,
+//   SOURCE_ADDRESS,
+//   SOURCE_PORT,
+//   DESTINATION_ADDRESS,
+//   DESTINATION_PORT
+// );
 //requestProperty(8, 2, DevicePropertyType.DevicePropertyType.VENDOR_NAME);
 // requestProperty(
 //   8,

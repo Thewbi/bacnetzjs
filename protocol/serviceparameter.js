@@ -530,7 +530,11 @@ class ServiceParameter {
       ", lengthValueType = " +
       this.lengthValueType;
 
-    result += " " + JSON.stringify(this.payload);
+    result +=
+      " " +
+      JSON.stringify(this.payload) +
+      " asString=" +
+      this.payload.toString();
     // result += " type: " + typeof this.payload;
     // if (typeof this.payload === Buffer) {
     //   result += " buffer";
