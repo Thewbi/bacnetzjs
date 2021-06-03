@@ -2,6 +2,7 @@ class DeviceObject {
   constructor() {
     this.objectType = -1;
     this.bacnetIdentifier = -1;
+    this.properties = [];
   }
 
   get asString() {

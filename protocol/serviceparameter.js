@@ -7,7 +7,6 @@ const DevicePropertyType = require("./devicepropertytype.js");
 class ServiceParameter {
   constructor() {
     this.tagClass = -1;
-    //this.applicationTagNumber = -1;
     this.lengthValueType = -1;
     this.tagNumber = 0;
     this.payload = null;
@@ -24,20 +23,15 @@ class ServiceParameter {
     // specific) and the length of the payload inside this service parameter
     let applicationTag =
       (this.tagNumber << 4) | (this.tagClass << 3) | this.lengthValueType;
-    //data[offset + index++] = (byte) applicationTag;
     data.writeUInt8(applicationTag & 0xff, offset + index++);
 
     // copy the payload in
-    //if (ArrayUtils.isNotEmpty(payload)) {
     if (this.payload != null) {
       // for extended values, preface the actual payload with the payload's length
       if (this.lengthValueType == ServiceParameter.EXTENDED_VALUE) {
-        //data[offset + index++] = byte(payload.length);
         data.writeUInt8(this.payload.length & 0xff, offset + index++);
       }
 
-      //System.arraycopy(payload, 0, data, offset + index, payload.length);
-      //data = Buffer.concat([data, this.payload]);
       for (let i = 0; i < this.payload.length; i++) {
         data.writeUInt8(this.payload.readUInt8(i), i + 1);
       }
@@ -74,7 +68,7 @@ class ServiceParameter {
     // Service parameters either are CONTEXT_SPECIFIC tags oder APPLICATION tags.
     // This if has two branches, one for CONTEXT_SPECIFIC tags and another APPLICATION tags.
     if (this.tagClass == TagClass.CONTEXT_SPECIFIC_TAG) {
-      console.log("length: " + this.lengthValueType);
+      //console.log("length: " + this.lengthValueType);
       //
       // CONTEXT_SPECIFIC tags
       //
@@ -82,13 +76,14 @@ class ServiceParameter {
         // 0x01
         case ServiceParameterConstants.PROPERTY_IDENTIFIER_CODE:
           this.payload = message[offset + 1] & 0xff;
-          console.log(
-            ">>>>> PROPERTY_IDENTIFIER_CODE of property " +
-              DevicePropertyType.getLabel(this.payload) +
-              " (" +
-              this.payload +
-              ")"
-          );
+
+          // console.log(
+          //   ">>>>> PROPERTY_IDENTIFIER_CODE of property " +
+          //     DevicePropertyType.getLabel(this.payload) +
+          //     " (" +
+          //     this.payload +
+          //     ")"
+          // );
 
           //   //the length of the contained payload is store in the first byte
           //   var payloadLength = message[offset + 1] & 0xff;
@@ -191,15 +186,15 @@ class ServiceParameter {
             offset + 1 + this.lengthValueType
           );
 
-          console.log(
-            ">>>>> UNSIGNED INTEGER. offset: " +
-              offset +
-              " length: " +
-              this.lengthValueType +
-              " The unsigned integer value is = " +
-              this.payload.toString("hex") +
-              " !"
-          );
+          // console.log(
+          //   ">>>>> UNSIGNED INTEGER. offset: " +
+          //     offset +
+          //     " length: " +
+          //     this.lengthValueType +
+          //     " The unsigned integer value is = " +
+          //     this.payload.toString("hex") +
+          //     " !"
+          // );
           break;
 
         // 0x07
@@ -309,7 +304,7 @@ class ServiceParameter {
     return this.lengthValueType + 1;
   }
 
-  get asString() {
+  get dataAsString() {
     let data = "";
 
     switch (this.tagClass) {
@@ -343,7 +338,7 @@ class ServiceParameter {
           case ServiceParameterConstants.APPLICATION_TAG_NUMBER_CHARACTER_STRING:
             // final String temp = new String(payload);
             // stringBuffer.append("Character String (7) '").append(temp).append("'");
-            data += " APPLICATION_TAG_NUMBER_CHARACTER_STRING";
+            data += " APPLICATION_TAG_NUMBER_CHARACTER_STRING " + this.payload.toString();
             break;
 
           case ServiceParameterConstants.UNSIGNED_INTEGER_CODE:
@@ -449,7 +444,7 @@ class ServiceParameter {
         data += "[CONTEXT_SPECIFIC_TAG]";
 
         switch (this.lengthValueType) {
-          case 1:
+          case ServiceParameterConstants.PROPERTY_IDENTIFIER_CODE:
             let codeAsUnsignedInt = this.payload;
             // stringBuffer
             //   .append("[DeviceProperty:")
@@ -461,7 +456,7 @@ class ServiceParameter {
               " [Property: " +
               DevicePropertyType.getLabel(codeAsUnsignedInt) +
               ", " +
-              codeAsUnsignedInt;
+              codeAsUnsignedInt + "]";
             break;
 
           case ServiceParameterConstants.OPENING_TAG_CODE:
@@ -487,8 +482,8 @@ class ServiceParameter {
               ((this.payload[2] & 0xff) << 8) |
               ((this.payload[3] & 0xff) << 0);
 
-            var objectType = (oi & (1023 << 22)) >> 22;
-            var bacnetIdentifier = (oi & (4194303 << 0)) >> 0;
+            let objectType = (oi & (1023 << 22)) >> 22;
+            let bacnetIdentifier = (oi & (4194303 << 0)) >> 0;
 
             // console.log(
             //   "objectType " +
@@ -496,6 +491,8 @@ class ServiceParameter {
             //     " bacnetIdentifier " +
             //     bacnetIdentifier
             // );
+
+            data += " [ObjectIdentifier: " + objectType + " " + bacnetIdentifier + "]";
 
             break;
 
@@ -517,6 +514,16 @@ class ServiceParameter {
         //stringBuffer.append(DevicePropertyType.getByCode(payload[0] & 0xff));
         break;
     }
+
+    return data;
+  }
+
+  get asStringShort() {
+    return this.dataAsString;
+  }
+
+  get asString() {
+    let data = this.dataAsString;
 
     let tagClassAsString =
       this.tagClass == 0 ? " Application Tag" : " Context Tag";

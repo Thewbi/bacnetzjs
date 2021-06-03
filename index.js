@@ -12,6 +12,7 @@ const ObjectType = require("./protocol/objecttype.js");
 
 const DeviceObject = require("./model/deviceobject.js");
 const MessageToDeviceObjectConverter = require("./conversion/MessageToDeviceObjectConverter.js");
+const PropertyMessageToDeviceObjectConverter = require("./conversion/PropertyMessageToDeviceObjectConverter.js");
 
 const DevicePropertyType = require("./protocol/devicepropertytype.js");
 
@@ -361,12 +362,16 @@ function requestAllProperties(
 
     bacnetMessage.parseServiceParameters();
 
-    console.log("requestAllProperties() " + bacnetMessage.asString);
+    let propertyMessageToDeviceObjectConverter = new PropertyMessageToDeviceObjectConverter();
+    propertyMessageToDeviceObjectConverter.convert(bacnetMessage, deviceObject);
+
+    deviceObject.properties.map(p => {
+      console.log(p.asShortString);
+    })
+
+    //console.log("requestAllProperties() " + bacnetMessage.asString);
   });
 
-  //var port = SOURCE_PORT;
-  //var port = 47808;
-  //var host = SOURCE_ADDRESS;
   socket.bind(sourcePort, sourceAddress);
 
   let deviceObject = new DeviceObject();
@@ -376,11 +381,9 @@ function requestAllProperties(
   let messageFactory = new MessageFactory();
   let message = messageFactory.propertiesAll(deviceObject);
 
-  let offset = 0;
-
-  let payload = message.bytes;
-
   // send a request and keep the socket open so the response can be retrieved
+  let offset = 0;
+  let payload = message.bytes;
   socket.send(
     payload,
     offset,
@@ -415,14 +418,14 @@ exports.requestAllProperties = requestAllProperties;
 // object-type: notification-class (15) - bacnet identifier: 40 - What does this do?
 
 //requestAllProperties(8, 2);
-// requestAllProperties(
-//   8,
-//   36,
-//   SOURCE_ADDRESS,
-//   SOURCE_PORT,
-//   DESTINATION_ADDRESS,
-//   DESTINATION_PORT
-// );
+requestAllProperties(
+  8,
+  36,
+  SOURCE_ADDRESS,
+  SOURCE_PORT,
+  DESTINATION_ADDRESS,
+  DESTINATION_PORT
+);
 //requestAllProperties(8, 25); // only works with destination specifier in NPDU!
 //requestAllProperties(19, 1); // object type: multistate value (19)
 //requestAllProperties(19, 2); // object type: multistate value (19)

@@ -48,7 +48,7 @@ class APDU {
   }
 
   get bytes() {
-    console.log("APDU bytes()");
+    //console.log("APDU bytes()");
     let offset = 0;
 
     var data = Buffer.alloc(this.dataSizeInBufferWithoutServiceParameters);
@@ -56,53 +56,53 @@ class APDU {
     let index = 0;
 
     // 1 Byte: APDU Type and APDU Flags
-    console.log("APDU bytes() type and flags");
+    //console.log("APDU bytes() type and flags");
     let apduTypeAndFlags = this.pduType;
     apduTypeAndFlags <<= 4;
     apduTypeAndFlags |= this.segmentedResponseAccepted ? 0x02 : 0x00;
     data.writeUInt8(apduTypeAndFlags & 0xff, offset + index++);
-    console.log(data);
+    //console.log(data);
 
     // 1 Byte: segmentation information
     if (
       this.segmentedResponseAccepted ||
       this.pduType == PDUType.PDUType.CONFIRMED_SERVICE_REQUEST_PDU
     ) {
-      console.log("APDU bytes() Segmentation Information");
+      //console.log("APDU bytes() Segmentation Information");
       data.writeUInt8(this.segmentationControl & 0xff, offset + index++);
-      console.log(data);
+      //console.log(data);
     }
 
     // 1 Byte: invoke ID
     if (this.invokeId >= 0) {
-      console.log("APDU bytes() invoke id");
+      //console.log("APDU bytes() invoke id");
       data.writeUInt8(this.invokeId, offset + index++);
-      console.log(data);
+      //console.log(data);
     }
 
     // 1 Byte: sequence number
     if (this.sequenceNumber >= 0) {
-      console.log("APDU bytes() sequence number");
+      //console.log("APDU bytes() sequence number");
       data.writeUInt8(this.sequenceNumber, offset + index++);
-      console.log(data);
+      //console.log(data);
     }
 
     // 1 Byte: proposed window size
     if (this.proposedWindowSize >= 0) {
-      console.log("APDU bytes() proposed window size");
+      //console.log("APDU bytes() proposed window size");
       data.writeUInt8(this.proposedWindowSize, offset + index++);
-      console.log(data);
+      //console.log(data);
     }
 
     // 1 Byte: service choice
     if (this.unconfirmedServiceChoice != null) {
-      console.log("APDU bytes() unconfirmed service choice");
+      //console.log("APDU bytes() unconfirmed service choice");
       data.writeUInt8(this.unconfirmedServiceChoice, offset + index++);
-      console.log(data);
+      //console.log(data);
     } else if (this.confirmedServiceChoice != null) {
-      console.log("APDU bytes() confirmed service choice");
+      //console.log("APDU bytes() confirmed service choice");
       data.writeUInt8(this.confirmedServiceChoice, offset + index++);
-      console.log(data);
+      //console.log(data);
     } else {
       throw "Either confirmedServiceChoice or unconfirmedServiceChoice is required!";
     }
@@ -110,15 +110,15 @@ class APDU {
     // service parameters (such as ObjectIdentifierServiceParameter)
     if (this.serviceParameters.length > 0) {
       for (let i = 0; i < this.serviceParameters.length; i++) {
-        console.log("APDU bytes() service parameter");
+        //console.log("APDU bytes() service parameter");
         let serviceParameter = this.serviceParameters[i];
         let serviceParameterBuffer = serviceParameter.bytes;
         data = Buffer.concat([data, serviceParameterBuffer]);
-        console.log(data);
+        //console.log(data);
       }
     }
 
-    console.log(data);
+    //console.log(data);
     return data;
   }
 
