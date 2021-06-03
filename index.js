@@ -41,9 +41,10 @@ const SOURCE_PORT = 12345;
 // for connecting from localhost to localhost you cannot bind to 127.0.0.1 but you must bind to 0.0.0.0 instead.
 // Otherwise the connection will work!
 // https://github.com/nodejs/node/issues/29047
-const SOURCE_ADDRESS = "0.0.0.0";
+//const SOURCE_ADDRESS = "0.0.0.0";
 //const SOURCE_ADDRESS = "127.0.0.1";
 //const SOURCE_ADDRESS = "192.168.0.2";
+const SOURCE_ADDRESS = "192.168.0.108";
 //const SOURCE_ADDRESS = "192.168.0.234";
 
 //const DESTINATION_PORT = 10002;
@@ -107,11 +108,11 @@ function requestObjectListSize(
   socket.on("message", function (message, remoteInfo) {
     console.log(
       "Response from " +
-        remoteInfo.address +
-        ":" +
-        remoteInfo.port +
-        " - " +
-        util.byteArrayToHexString(message)
+      remoteInfo.address +
+      ":" +
+      remoteInfo.port +
+      " - " +
+      util.byteArrayToHexString(message)
     );
 
     // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
@@ -157,9 +158,9 @@ function requestObjectListSize(
     function () {
       console.log(
         "requestObjectListSize() Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
     }
   );
@@ -218,11 +219,11 @@ function requestObjectList(
   socket.on("message", function (message, remoteInfo) {
     console.log(
       "Response from " +
-        remoteInfo.address +
-        ":" +
-        remoteInfo.port +
-        " - " +
-        util.byteArrayToHexString(message)
+      remoteInfo.address +
+      ":" +
+      remoteInfo.port +
+      " - " +
+      util.byteArrayToHexString(message)
     );
 
     // response object list size - 810a0016010030010c0c020003e8194c29003e211d3f
@@ -262,9 +263,9 @@ function requestObjectList(
 
   console.log(
     "requestObjectList() Sending to IP: " +
-      targetAddress +
-      " Port: " +
-      targetPort
+    targetAddress +
+    " Port: " +
+    targetPort
   );
 
   // send a request and keep the socket open so the response can be retrieved
@@ -277,9 +278,9 @@ function requestObjectList(
     function (error, bytes) {
       console.log(
         "Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
       console.log("error: '" + error + "' bytes = " + bytes);
     }
@@ -393,9 +394,9 @@ function requestAllProperties(
     function () {
       console.log(
         "Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
     }
   );
@@ -509,9 +510,9 @@ function requestProperty(
     function () {
       console.log(
         "Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
     }
   );
@@ -615,9 +616,9 @@ function writeProperty(objectType, bacnetIdentifier, value) {
     function () {
       console.log(
         "writeProperty() Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
     }
   );
@@ -708,9 +709,9 @@ function covSubscription(
     function () {
       console.log(
         "covSubscription() Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
     }
   );
@@ -724,9 +725,9 @@ function subscribeCOV(objectType, bacnetIdentifier) {
     var address = socket.address();
     console.log(
       "subscribeCOV() UDP Server listening on " +
-        address.address +
-        ":" +
-        address.port
+      address.address +
+      ":" +
+      address.port
     );
   });
 
@@ -774,7 +775,7 @@ function subscribeCOV(objectType, bacnetIdentifier) {
     if (
       bacnetMessage.apdu.unconfirmedServiceChoice ==
       UnconfirmedServiceChoice.UnconfirmedServiceChoice
-        .UNCONFIRMED_COV_NOTIFICATION
+      .UNCONFIRMED_COV_NOTIFICATION
     ) {
       console.log("COV-Notification received!");
 
@@ -793,12 +794,12 @@ function subscribeCOV(objectType, bacnetIdentifier) {
 
       console.log(
         ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
-          ObjectType.getLabel(objectType) +
-          " (" +
-          objectType +
-          ") " +
-          " bacnetIdentifier = " +
-          bacnetIdentifier
+        ObjectType.getLabel(objectType) +
+        " (" +
+        objectType +
+        ") " +
+        " bacnetIdentifier = " +
+        bacnetIdentifier
       );
 
       // object identifier of child object
@@ -815,12 +816,12 @@ function subscribeCOV(objectType, bacnetIdentifier) {
 
       console.log(
         ">>>>> OBJECT_IDENTIFIER_CODE objectType = " +
-          ObjectType.getLabel(objectType) +
-          " (" +
-          objectType +
-          ") " +
-          " bacnetIdentifier = " +
-          bacnetIdentifier
+        ObjectType.getLabel(objectType) +
+        " (" +
+        objectType +
+        ") " +
+        " bacnetIdentifier = " +
+        bacnetIdentifier
       );
 
       for (let i = 0; i < bacnetMessage.apdu.serviceParameters.length; i++) {
@@ -850,7 +851,7 @@ function subscribeCOV(objectType, bacnetIdentifier) {
 
   var port = SOURCE_PORT;
   var host = SOURCE_ADDRESS;
-  socket.bind(port, host);
+  //socket.bind(port, host);
 
   let invokeId = 0;
   let subscriptionLifetimeInSeconds = 10;
@@ -861,13 +862,13 @@ function subscribeCOV(objectType, bacnetIdentifier) {
 
   // initial subscribe to object-type: multistate value (19) - bacnet identifier: 3 - name: 'TZ320_state'
   invokeId++;
-  covSubscription(
-    socket,
-    objectType,
-    bacnetIdentifier,
-    invokeId,
-    subscriptionLifetimeInSeconds
-  );
+  // covSubscription(
+  //   socket,
+  //   objectType,
+  //   bacnetIdentifier,
+  //   invokeId,
+  //   subscriptionLifetimeInSeconds
+  // );
 
   setInterval(function () {
     console.log(
@@ -963,9 +964,9 @@ function activeCOVSubscriptions(objectType, bacnetIdentifier, invokeId) {
     function () {
       console.log(
         "activeCOVSubscriptions() Sent '" +
-          util.byteArrayToHexString(payload) +
-          "' Length = " +
-          payload.length
+        util.byteArrayToHexString(payload) +
+        "' Length = " +
+        payload.length
       );
     }
   );
@@ -989,11 +990,11 @@ client.on("message", function (message, remoteInfo) {
   // output sender IP and port and raw byte buffer
   console.log(
     "Message from: " +
-      remoteInfo.address +
-      ":" +
-      remoteInfo.port +
-      " - " +
-      util.byteArrayToHexString(message)
+    remoteInfo.address +
+    ":" +
+    remoteInfo.port +
+    " - " +
+    util.byteArrayToHexString(message)
   );
 
   // ignore own broadcasts
@@ -1046,7 +1047,7 @@ client.on("message", function (message, remoteInfo) {
         default:
           console.log(
             "unknown apdu.unconfirmedServiceChoice = " +
-              bacnetMessage.apdu.unconfirmedServiceChoice
+            bacnetMessage.apdu.unconfirmedServiceChoice
           );
           break;
       }
@@ -1062,14 +1063,14 @@ client.on("message", function (message, remoteInfo) {
 // START: ENABLE FOR WHO-IS
 //
 
-// server.bind(function () {
-//   // server will listen to broadcast messages
-//   server.setBroadcast(true);
-//   // schedule a call to the broadcastWhoIs function every x milliseconds
-//   setInterval(broadcastWhoIs, 3000);
-// });
+server.bind(function () {
+  // server will listen to broadcast messages
+  server.setBroadcast(true);
+  // schedule a call to the broadcastWhoIs function every x milliseconds
+  setInterval(broadcastWhoIs, 3000);
+});
 
-// client.bind(BROADCAST_LISTENING_PORT);
+client.bind(BROADCAST_LISTENING_PORT);
 
 //
 // STOP: ENABLE FOR WHO-IS
